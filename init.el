@@ -23,19 +23,19 @@
 This is Marco Heisig's [[http://www.gnu.org/software/emacs/emacs.html][Emacs]] configuration. It is written in a Literal
 Programming style and the [[http://www.orgmode.org][Org mode]] is used to manage the individual code
 snippets. The first few lines of this file contain magic incantations that
-make it also a valid Emacs initialization file.
+make it also a valid Emacs `init.el' file.
 
 This initialization is divided into several chapters. The first chapter,
-called [[*Meta Configuration][Meta Configuration]] describes how the configuration itself is loaded
-and how missing functionality is obtained via the Emacs package
+with the title [[*Meta Configuration][Meta Configuration]], describes how the configuration itself
+is loaded and how missing functionality is obtained via the Emacs package
 manager. The chapter [[*Minor Modes][Minor Modes]] enables and configures a plethora of
 secondary features for an amazing Emacs experience. The third chapter [[*Major Modes][Major
 Modes]] contains configuration sorted by the buffer type it applies to, like
-the c-mode for operating on files in the C Language. Many of those Major
-Modes also enable several Minor Modes. All human computer interaction is
+the `c-mode' for operating on files in the C Language. Many of those Major
+Modes also enable several Minor Modes. Most human computer interaction is
 placed separately in the chapter [[*User%20Interface][User Interface]]. Prominent features of this
-chapter are color themes, undo and redo, auto completion and the choice of
-initial open buffers.
+chapter are color themes, keybindings, undo and redo, auto completion and
+the choice of initial open buffers.
 
 A word of warning -- this configuration file is heavily centered around the
 [[https://www.emacswiki.org/emacs/Evil][Evil mode]]. Seasoned Emacs users might be surprised by the Vi-style
@@ -852,9 +852,10 @@ With a prefix argument, perform `macroexpand-all' instead."
 #+END_SRC
 ** Octave like languages
 There is a whole family of programming toolkits for applied mathematics,
-like Octave
+all with similar syntax as Octave.
 #+BEGIN_SRC emacs-lisp
-
+(setup octave-mode
+  (:mode "\\.sci\\'" "\\.m\\'"))
 #+END_SRC
 ** Proof General
 Proof General is an Emacs frontend for various Theorem Provers.

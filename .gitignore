@@ -4,3 +4,5 @@
 !init.el
 # ... and .gitignore, otherwise things get paradox
 !.gitignore
+# ... and this little README symlink to please github
+!README.org

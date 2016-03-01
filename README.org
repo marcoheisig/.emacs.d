@@ -1,1 +1,1 @@
-/home/marco/.emacs.d/init.el
+init.el

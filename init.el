@@ -43,7 +43,8 @@ the default Emacs keybindings are cumbersome.
 
 If you are not Marco Heisig and plan to use this configuration, some lines
 should be adapted accordingly. As a helpful starting point, all lines that
-should definitely be reviewed are listed by the following command:
+should definitely be reviewed are listed by the following command (assuming
+you are reading this file from Emacs)
 
 #+BEGIN_SRC emacs-lisp :eval no
 ;; place cursor after the final `)' and press C-x C-e to evaluate
@@ -244,6 +245,9 @@ section describes how to set it up.
        (indent-according-to-mode)))))
 #+END_SRC
 ** Multiple Cursors
+A convenient feature, especially when it comes to renaming multiple
+occurences of a variable in source code. In its simplest form, it suffices
+to mark a word and press `R' to edit all its occurences at the same time.
 #+BEGIN_SRC emacs-lisp
 (setup iedit
   (:ensure t))
@@ -284,6 +288,11 @@ section describes how to set it up.
 #+END_SRC
 
 ** Openwith mode - Open certain buffers with external tools
+Despite the best attempts of the Emacs community, Emacs can not (yet) open
+all file types gracefully. The openwith mode compensates for this by
+opening files with certain extensions in external programs. It is important
+to adapt the variable `openwith-associations' to suit ones personal
+preferences.
 #+BEGIN_SRC emacs-lisp
 (setup openwith
   (:ensure t)
@@ -1040,8 +1049,7 @@ sessions. This configuration uses a slightly modified Zenburn theme.
 
    (face-spec-set
     'button
-    '((t (:inherit link))))
-   ))
+    '((t (:inherit link))))))
 #+END_SRC
 
 The package `powerline' makes the Emacs mode line more beautiful.
@@ -1107,21 +1115,23 @@ The `jk' keystroke can do even more -- when Evil is already in normal mode,
 leave the current buffer somehow.
 
 #+BEGIN_SRC emacs-lisp
-(defun leave-buffer (prefix)
-  (interactive "P")
-  (cond
-   (org-src-mode
-    (org-edit-src-exit))
-   ((eq major-mode 'dired-mode)
-    (when prefix (quit-window t))
-    (dired-up-directory))
-   ((buffer-file-name)
-    (when prefix (quit-window t))
-    (find-file "."))
-   (t
-    (quit-window prefix))))
+(setup leave-buffer
+  (:config
+   (defun leave-buffer (prefix)
+     (interactive "P")
+     (cond
+      (org-src-mode
+       (org-edit-src-exit))
+      ((eq major-mode 'dired-mode)
+       (when prefix (quit-window t))
+       (dired-up-directory))
+      ((buffer-file-name)
+       (when prefix (quit-window t))
+       (find-file "."))
+      (t
+       (quit-window prefix))))
 
-(key-chord-define evil-normal-state-map "jk" 'leave-buffer)
+   (key-chord-define evil-normal-state-map "jk" 'leave-buffer)))
 #+END_SRC
 
 No bind the key `U' to the awesome Undo-Tree mode, `SPC' to the Ace Jump Word
@@ -1129,9 +1139,11 @@ command that queries for a character and jumps to a matching word and `C-c o' to
 the `occur' command.
 
 #+BEGIN_SRC emacs-lisp
-(define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
-(define-key evil-normal-state-map (kbd "SPC") 'evil-ace-jump-word-mode)
-(define-key evil-normal-state-map (kbd "C-c o") 'occur)
+(setup evil-basic-keybindings
+  (:config
+   (define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
+   (define-key evil-normal-state-map (kbd "SPC") 'evil-ace-jump-word-mode)
+   (define-key evil-normal-state-map (kbd "C-c o") 'occur)))
 #+END_SRC
 
 Now a little gem -- `save-if-appropriate'. This function executes a bunch of
@@ -1178,6 +1190,9 @@ Now come some humble attempts to make Emacs even more evil.
    (define-key Info-mode-map "b" 'Info-history-back)
    (define-key Info-mode-map "w" 'Info-history-forward)
 
+   (define-key dired-mode-map "n" 'evil-search-next)
+   (define-key dired-mode-map "N" 'evil-search-previous)
+
    (add-hook 'help-mode-hook 'evil-motion-state)
    (add-hook 'package-menu-mode-hook 'evil-motion-state)))
 #+END_SRC
@@ -1220,18 +1235,21 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
 
 * Possible Improvements
 A list of things that could be improved in this Emacs config
-** TODO The powerline is not activated in the *Messages* buffer
+*** TODO The powerline is not activated in the *Messages* buffer
 Probably because the *Messages* buffer is created before powerline.
-** TODO The `M-.' is shadowed by `evil-repeat-pop-next', but should jump to a Lisp definition.
-** TODO fix n and N search in dired
-** TODO configure and use doc-view mode
+*** TODO The `M-.' is shadowed by `evil-repeat-pop-next', but should jump to a Lisp definition.
+Probably also some other Evil features could be added in SLIME
+*** TODO configure and use doc-view mode
 Probably impossible to make doc-view mode as good as evince, but worth a
 try. Maybe I should wait for Emacs Xwidgets support...
-** TODO proofgeneral and show-paren
+*** TODO proofgeneral and show-paren
 For magic reasons, it is not possible to activate show-paren-mode in
 proofgeneral.
-** TODO improve `dired-convert'
-maybe move the conversion patterns into a encoding and a decoding alist...
-** TODO battery
+*** TODO battery
 I would really like a single character that shows whether I charge,
 discharge and how fast this happens
+*** TODO enable company in more modes
+There are many modes that would profit from company completion and do not
+at the moment.
+*** TODO review auto saving
+Probably it would be useful to re-enable auto-save in some way

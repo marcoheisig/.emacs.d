@@ -599,6 +599,31 @@ heuristics. The command is strictly more useful than `dired-compress' and is
 therefore bound to the key `Z' instead.
 
 #+BEGIN_SRC emacs-lisp
+(defvar dired-convert-extraction-associations
+  '(("\\.\\(?:gz\\|tgz\\|bz2\\|xz\\|zip\\|rar\\)\\'"
+     "7z" "x" src)
+    ("\\.tar\\'"
+     "tar" "xpf" src))
+  "Associations of file patterns to external programs that
+`dired-convert' uses to detect how to extract a file. The keys
+are regular expressions applied to the source file, the value is
+a list of strings or the symbols `src' and `dst', which are
+substituted with the actual file names.")
+
+(defvar dired-convert-conversion-associations
+  '(("\\.\\(?:flv\\|mov\\|mp4\\|mp3\\|ogg\\|wma\\|flac\\|wav\\)\\'"
+     "ffmpeg" "-i" src "-ab 192K" dst)
+    ("\\.\\(?:png\\|tga\\|bmp\\|jpeg\\|jpg\\|gif\\)\\'"
+     "convert" src dst)
+    ("\\.\\(?:gz\\|tgz\\|bz2\\|xz\\|zip\\|rar\\|z\\)\\'"
+     "7z" "a" dst src))
+  "Associations of file patterns to external programs that
+`dired-convert' uses to convert a file to the specified
+extension.  The keys are regular expressions applied to the name
+of the desired destination file, the value is a list of strings
+or the symbols `src' and `dst', which are substituted with the
+actual file names.")
+
 (defun dired-convert (filenames target-extension)
   "Try to perform a quick and dirty conversion of all files
 specified by the list of strings FILENAMES to the format
@@ -613,47 +638,41 @@ files or the file under the cursor if the former is empty."
              (list (read-file-name "File to convert: ")))
          (read-string "Desired extension (empty = extract): ")))
   (cl-flet
-      ((run (string &rest args)
-            (let ((str (apply 'format string
-                              (mapcar 'shell-quote-wildcard-pattern args))))
-              (message str) ;; be verbose
-              (shell-command str)))
-       (ext-p (filename &rest extensions)
-              (member (upcase (or (file-name-extension filename) ""))
-                      extensions)))
-    (when (yes-or-no-p
-           (if (string-equal target-extension "")
-               (format "Extract the files %S?" filenames)
-             (format "Convert the files %S to %s?"
-                     filenames target-extension)))
-      (dolist (source filenames)
-        (let* ((directory (file-name-directory source))
-               (base (file-name-base source))
-               (target (concat directory base "." target-extension))
-               (source-extension (or (file-name-extension source) "")))
-          (if (ext-p target "")
-              ;; try to extract the file if the extension is empty
-              (cond
-               ((ext-p source "GZ" "TGZ" "BZ2" "XZ" "ZIP" "RAR")
-                (run "7z e %s" source))
-               ((ext-p source "TAR")
-                (run "tar xpf %s" source))
-               (t (error "No known way to extract %s" source)))
-            ;; otherwise to convet to the specified extension
-            (cond
-             ((ext-p target "FLV" "MOV" "MP4" "MP3" "OGG" "WMA"
-                     "FLAC" "WAV")
-              (run "ffmpeg -i %s -ab 192K %s" source target))
-             ((ext-p target "PNG" "TGA" "BMP" "JPEG" "JPG" "GIF")
-              (run "convert %s %s" source target))
-             ((ext-p target "TAR.GZ" "GZ" "TGZ" "XZ" "TAR.XZ" "BZ2"
-                     "TAR.BZ" "ZIP" "RAR" "Z")
-              (run "7z a %s %s" target source))
-             (t (error "No known way to convert from %s to %s"
-                       source-extension target-extension)))))
-        ;; make newly created files appear in dired immediately
-        (revert-buffer)
-        (redisplay)))))
+      ((cmdize
+        (src dst elements)
+        (mapconcat
+         (lambda (x)
+           (shell-quote-argument
+            (pcase x
+              ((pred stringp) x)
+              (`src src)
+              (`dst dst)
+              (_ (error "Invalid element %s" x)))))
+         elements " ")))
+    (let ((ex (string-equal target-extension "")))
+      (when (yes-or-no-p
+             (if ex (format "Extract the files %S?" filenames)
+               (format "Convert the files %S to %s?"
+                       filenames target-extension)))
+        (dolist (src filenames)
+          (let ((dst (concat (file-name-directory src)
+                             (file-name-base src)
+                             "." target-extension)))
+            (let ((key (if ex src dst))
+                  (assocs (if ex dired-convert-extraction-associations
+                            dired-convert-conversion-associations)))
+              (let ((cmd (cmdize
+                          src dst
+                          (cdr
+                           (cl-find-if
+                            (lambda (x)
+                              (string-match x key))
+                            assocs :key #'car)))))
+                (message cmd) ;; be verbose
+                (shell-command cmd))))
+          ;; make newly created files appear in dired immediately
+          (revert-buffer)
+          (redisplay))))))
 
 (define-key dired-mode-map (kbd "Z") 'dired-convert)
 #+END_SRC
@@ -1165,9 +1184,7 @@ Now come some humble attempts to make Emacs even more evil.
 
 ** Initial Buffers
 A collection of buffers that should be opened as soon as Emacs is
-started. The list contains mostly directories. I try to place all my
-important data in a separate folder "~/userdata/" to simplify backups. I
-want the first level and some of the second levels always opened in Emacs.
+started. The list contains mostly directories.
 
 #+BEGIN_SRC emacs-lisp
 (setup initial-buffers

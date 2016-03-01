@@ -1,0 +1,6 @@
+# ignore everything ...
+*
+# ... but my init.el file
+!init.el
+# ... and .gitignore, otherwise things get paradox
+!.gitignore

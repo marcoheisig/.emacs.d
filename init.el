@@ -610,7 +610,12 @@ heuristics. The command is strictly more useful than `dired-compress' and is
 therefore bound to the key `Z' instead.
 
 #+BEGIN_SRC emacs-lisp
-(defvar dired-convert-extraction-associations
+(defgroup dired-convert nil
+  "Quick and dirty file conversions/extractions."
+  :prefix "dired-convert-"
+  :group 'dired)
+
+(defcustom dired-convert-extraction-associations
   '(("\\.\\(?:gz\\|tgz\\|bz2\\|xz\\|zip\\|rar\\)\\'"
      "7z" "x" src)
     ("\\.tar\\'"
@@ -621,9 +626,11 @@ are regular expressions applied to the source file, the value is
 a list of strings or the symbols `src' and `dst', which are
 substituted with the actual file names.")
 
-(defvar dired-convert-conversion-associations
-  '(("\\.\\(?:flv\\|mov\\|mp4\\|mp3\\|ogg\\|wma\\|flac\\|wav\\)\\'"
-     "ffmpeg" "-i" src "-ab 192K" dst)
+(defcustom dired-convert-conversion-associations
+  '(("\\.\\(?:mp3\\|ogg\\|wma\\|flac\\|wav\\|m4a\\)\\'"
+     "ffmpeg" "-i" src "-ab" "192K" "-vn" dst)
+    ("\\.\\(?:flv\\|mov\\|mp4\\|webm\\|mkv\\)\\'"
+     "ffmpeg" "-i" src "-ab" "192K" dst)
     ("\\.\\(?:png\\|tga\\|bmp\\|jpeg\\|jpg\\|gif\\)\\'"
      "convert" src dst)
     ("\\.\\(?:gz\\|tgz\\|bz2\\|xz\\|zip\\|rar\\|z\\)\\'"
@@ -997,15 +1004,15 @@ whitespace.
    (global-whitespace-mode)))
 #+END_SRC
 
-Another thing that has probably scared away thousands of potential Emacs users
--- the automatic backup files. As soon as an Emacs user gets his hands on a
-file, it clobbers the directory with a backup file with a tilde. This
-configuration disables auto saving by default. If autosaving is activated, it
-places the files in a temporary directory. There are two reasons for turning off
-auto saving by default: The first one is that if a file really matters, one
-should use a versioning tool like Git and some hardware backup solution. The
-second, more profane one is that the [[*Encrypting%20parts%20of%20a%20buffer%20with%20Org%20Crypt][org-crypt]] mode does not work well with
-auto-save.
+Another thing that has probably scared away thousands of potential Emacs
+users -- the automatic backup files. As soon as an Emacs user gets his
+hands on a file, it clobbers the directory with a backup file with a
+tilde. This configuration disables auto saving by default. If autosaving is
+activated, it places the files in a temporary directory. There are two
+reasons for turning off auto saving by default: The first one is that if a
+file really matters, one should use a versioning tool like Git and some
+hardware backup solution. The second, more profane one is that the
+org-crypt mode does not work well with auto-save.
 
 #+BEGIN_SRC emacs-lisp
 (setup auto-save

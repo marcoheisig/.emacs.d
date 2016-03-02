@@ -621,10 +621,13 @@ therefore bound to the key `Z' instead.
     ("\\.tar\\'"
      "tar" "xpf" src))
   "Associations of file patterns to external programs that
-`dired-convert' uses to detect how to extract a file. The keys
-are regular expressions applied to the source file, the value is
-a list of strings or the symbols `src' and `dst', which are
-substituted with the actual file names.")
+`dired-convert' uses to detect how to extract a file."
+  :type '(alist
+          :key-type (regexp :tag "Pattern")
+          :value-type (repeat
+                       (choice string
+                               (const src)
+                               (const dst)))))
 
 (defcustom dired-convert-conversion-associations
   '(("\\.\\(?:mp3\\|ogg\\|wma\\|flac\\|wav\\|m4a\\)\\'"
@@ -637,10 +640,13 @@ substituted with the actual file names.")
      "7z" "a" dst src))
   "Associations of file patterns to external programs that
 `dired-convert' uses to convert a file to the specified
-extension.  The keys are regular expressions applied to the name
-of the desired destination file, the value is a list of strings
-or the symbols `src' and `dst', which are substituted with the
-actual file names.")
+extension."
+  :type '(alist
+          :key-type (regexp :tag "Pattern")
+          :value-type (repeat
+                       (choice string
+                               (const src)
+                               (const dst)))))
 
 (defun dired-convert (filenames target-extension)
   "Try to perform a quick and dirty conversion of all files

@@ -249,7 +249,7 @@ many video formats.
 (setup battery
   (:ensure t)
   (:config
-   (setf battery-mode-line-format "🔋 %p")
+   (setf battery-mode-line-format "🔋 %p%%%%")
    (setf battery-update-interval 5)
    (display-battery-mode 1)))
 #+END_SRC
@@ -1140,8 +1140,17 @@ modifications.
 
    (set-face-foreground
     'font-lock-regexp-grouping-construct
-    "SeaGreen2")
-   ))
+    "SeaGreen2")))
+#+END_SRC
+
+Setting the default font.
+
+#+BEGIN_SRC emacs-lisp
+;; (set-face-font 'default "DejaVu Sans Mono")
+;; (set-face-font 'default "Nimbus Mono L")
+;; (set-face-font 'default "Liberation Mono")
+;; (set-face-font 'default "Droid Sans Mono")
+;; (set-face-font 'default "FreeMono")
 #+END_SRC
 
 The package `powerline' and its derivative `spaceline' make the Emacs mode
@@ -1169,7 +1178,7 @@ background to illustrate the block structure.
    (setf org-src-fontify-natively t)
 
    (defun org-src-fontification--after (lang start end)
-     (remove-text-properties start end '(:background nil))
+     ;; Throws "Invalid face reference" errors, but I don't know why...
      (add-face-text-property start end '(:background "#312b3a")))
 
    (advice-add 'org-src-font-lock-fontify-block

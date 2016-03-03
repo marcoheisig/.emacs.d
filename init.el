@@ -150,6 +150,7 @@ Melpa and the Org mode archives.
    (update-load-path)
    (package-initialize)))
 #+END_SRC
+
 ** Customization
 Emacs has a convenient interface for customization, that can be accessed by
 the command `M-x customize'. This configuration does not use the customization
@@ -164,6 +165,7 @@ information is stored in another independent file.
    (setq custom-file "~/.emacs.d/custom.el")
    (load custom-file)))
 #+END_SRC
+
 * Minor Modes
 The bulk of features within Emacs is provided by different [[info:Elisp#Modes][Modes]]. This chapter
 will describe the use and customization of each individual mode.
@@ -178,6 +180,7 @@ navigation commands.
 (setup undo-tree
   (:ensure t))
 #+END_SRC
+
 ** Rainbow delimiters
 Many programming languages gain additional clarity if pairs of matching
 delimiters are coloured differently. The rainbow delimiters mode does just
@@ -186,6 +189,13 @@ that.
 (setup rainbow-delimiters
   (:ensure t))
 #+END_SRC
+
+** Color highlighting with Rainbow Mode
+#+BEGIN_SRC emacs-lisp
+(setup rainbow-mode
+  (:ensure t))
+#+END_SRC
+
 ** The Evil Mode
 The [[info:evil][Evil Mode]] is the most sophisticated Vi emulation for Emacs, and this
 section describes how to set it up.
@@ -204,14 +214,25 @@ section describes how to set it up.
    (setq evil-want-C-i-jump nil)
    (setq evil-want-C-w-delete nil)))
 #+END_SRC
+
+** Recording Emacs sessions with Camcorder
+Some Emacs features are better explained with a short demonstration video
+than many words. The camcorder package allows to record Emacs sessions in
+many video formats.
+#+BEGIN_SRC emacs-lisp
+(setup camcorder
+  (:ensure t)
+  (:config
+   (define-key global-map (kbd "<f12>")
+     'camcorder-mode)))
+#+END_SRC
+
 ** Monitoring the Battery
 #+BEGIN_SRC emacs-lisp
-(setup battery
-  (:config
-   (setq battery-mode-line-format "🔋%rAh %p%%%%")
-   (setq battery-update-interval 5)
-   (display-battery-mode 1)))
+(setup fancy-battery
+  (:ensure t))
 #+END_SRC
+
 ** The Insidious Big Brother Database for Emacs
 #+BEGIN_SRC emacs-lisp
 (setup bbdb
@@ -223,6 +244,7 @@ section describes how to set it up.
          bbdb-north-american-phone-numbers-p nil)
    (bbdb-initialize)))
 #+END_SRC
+
 ** Automatical Text Completion with Company
 #+BEGIN_SRC emacs-lisp
 (setup company-auctex
@@ -246,6 +268,7 @@ section describes how to set it up.
          (company-complete-common)
        (indent-according-to-mode)))))
 #+END_SRC
+
 ** Multiple Cursors
 A convenient feature, especially when it comes to renaming multiple
 occurences of a variable in source code. In its simplest form, it suffices
@@ -313,6 +336,7 @@ preferences.
            ("\\.\\(?:mp3\\|wav\\|mp4\\|mpe?g\\|avi\\|flac\\|ogg\\|wma\\|m4a\\)\\'"
             "vlc" (file))))))
 #+END_SRC
+
 ** Regular Expression Building
 A mode for interactively building regular expressions and viewing their
 effect on the selected buffer. Mostly made obsolete by the Evil mode search
@@ -323,6 +347,7 @@ with multiple grouping constructs.
   (:config
    (setq reb-re-syntax 'read)))
 #+END_SRC
+
 ** Bibliographic References with Reftex
 #+BEGIN_SRC emacs-lisp
 (setup reftex
@@ -346,6 +371,7 @@ with multiple grouping constructs.
    (define-key org-mode-map (kbd "C-c r") 'reftex-citation)
    (add-hook 'org-mode-hook 'org-mode-reftex-setup)))
 #+END_SRC
+
 ** Image viewing with Emacs
 Emacs can open images but does not rescale them to fit to the buffer. The
 `image+' library scales pictures accordingly.
@@ -356,11 +382,13 @@ Emacs can open images but does not rescale them to fit to the buffer. The
    (imagex-global-sticky-mode)
    (imagex-auto-adjust-mode)))
 #+END_SRC
+
 ** Gracefully manage matching Parentheses with Paredit
 #+BEGIN_SRC emacs-lisp
 (setup paredit
   (:ensure t))
 #+END_SRC
+
 * Major Modes
 ** The Org Mode
 If Emacs is the place a programmer lives when using his computer, the [[info:org][Org mode]]
@@ -391,22 +419,6 @@ between organizing, note taking and programming in amazing ways.
    (setq-default org-tag-alist
                  '(("crypt" . ?c)
                    ("drill" . ?d)))
-   (setq org-todo-keyword-faces
-         (quote
-          (("TODO" . "red")
-           ("STARTED" . "red")
-           ("APPT" . "sienna")
-           ("WAITING" . "orange")
-           ("CANCELED" . "grey")
-           ("DONE" . "forestgreen")
-           ("DELEGATED" . "forestgreen")
-           ("IGNORED" . "grey"))))
-   (setq org-todo-keywords
-         '((sequence
-            "TODO(t)" "STARTED(s!)" "WAITING(w/!)" "DELEGATED(g@/!)"
-            "|" "DONE(d!)" "CANCELED(c)")
-           (sequence
-            "|" "APPT(a)" "MOVED(m)" "VISITED(v)" "IGNORED(i)")))
    (add-hook 'org-mode-hook 'org-indent-mode)
    (global-set-key "\C-cl" 'org-store-link)
    (global-set-key "\C-ce" 'org-capture)
@@ -458,6 +470,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
        "* %^{Who said it} %U
                \"%?\"")))))
 #+END_SRC
+
 *** Generating LaTeX from Org mode buffers
 #+BEGIN_SRC emacs-lisp
 (setup cdlatex
@@ -521,11 +534,35 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
       (scheme . t)
       (screen . t)
       (sh . t)))
-   (setq org-src-fontify-natively t)
    (setq org-src-preserve-indentation nil)
    (setq org-src-tab-acts-natively t)
    (setq org-src-window-setup 'other-window)
    (setq-default org-export-babel-evaluate 'inline-only)))
+#+END_SRC
+
+Org mode presents two options for rendering source code blocks. The default
+one is to use the `org-block' face. The other one can be activated by
+setting `org-src-fontify-natively' to a non-nil value and displays the code
+according to the major mode of its language. The approach here is a hybrid
+solution that first uses native fontification, but the applies a different
+background to illustrate the block structure.
+
+#+BEGIN_SRC emacs-lisp
+(setq org-src-fontify-natively t)
+
+(defun org-src-fontification--around (lang start end)
+  (let ((bg-color (color-darken-name
+                   (or (face-background 'org-block-begin-line)
+                       (face-background 'default)
+                       "#FFFFFF")
+                   2.0)))
+
+    (add-face-text-property
+     start end `(background-color . ,bg-color))))
+
+(advice-add 'org-src-font-lock-fontify-block
+            :after #'org-src-fontification--around)
+
 #+END_SRC
 
 The org-src minor mode allows to edit a single source code block in a
@@ -546,6 +583,7 @@ buffers.
 
    (add-hook 'org-src-mode-hook 'org-src-sync-evil-state)))
 #+END_SRC
+
 *** Encrypting parts of a buffer with Org Crypt
 #+BEGIN_SRC emacs-lisp
 (setup org-crypt
@@ -556,6 +594,7 @@ buffers.
    (setq org-tags-exclude-from-inheritance '("crypt"))
    (setq org-crypt-key "05369722")))
 #+END_SRC
+
 *** Beautiful Presentations with Org Reveal
 #+BEGIN_SRC emacs-lisp
 (setup ox-reveal
@@ -565,6 +604,7 @@ buffers.
     org-reveal-root
     "file:///home/marco/.emacs.d/elpa/ox-reveal-2015022.2306/reveal.js")))
 #+END_SRC
+
 *** Efficient Learning with Org drill
 Org drill is an amazing tool to learn new facts. In a first step, one creates
 drill cards, which are nothing more than org subtrees with some metadata and the
@@ -576,6 +616,7 @@ drill session.
    ;; prevent drill hints from ruining Latex formulas
    (setq org-drill-hint-separator "||HINT||")))
 #+END_SRC
+
 ** Latex Editing with Auctex
 #+BEGIN_SRC emacs-lisp
 (setup auctex
@@ -585,6 +626,7 @@ drill session.
   (:config
    (setq-default TeX-PDF-mode t)))
 #+END_SRC
+
 ** Directory Browsing with Dired
 There are numerous little tweaks to enhance the dired usability. One of them is
 simply to activate dired+, another one is to enable recursive copies and enable
@@ -592,15 +634,51 @@ simply to activate dired+, another one is to enable recursive copies and enable
 adjacent [[info:Emacs#Windows][Emacs windows]].
 
 #+BEGIN_SRC emacs-lisp
-(setup dired+
-  (:ensure t)
+(setup dired
   (:config
    (setq dired-dwim-target t
          dired-recursive-copies 'top
          dired-listing-switches "-ahl"
          dired-auto-revert-buffer t
-         wdired-allow-to-change-permissions 'advanced)
-   (setq diredp-hide-details-initially-flag nil)))
+         wdired-allow-to-change-permissions 'advanced)))
+
+(setup dired+
+  (:ensure t)
+  (:config
+   (global-dired-hide-details-mode 1)
+
+   ;; Many dired+ faces are hardcoded, this code replaces them with
+   ;; meaningful other faces from the current color theme
+   (cl-flet ((respec (face &rest arguments)
+                     (apply #'set-face-attribute
+                            face nil
+                            :foreground 'unspecified
+                            :background 'unspecified
+                            arguments)))
+
+     (respec 'diredp-compressed-file-suffix :inherit 'font-lock-comment-face)
+     (respec 'diredp-file-suffix :inherit 'font-lock-string-face)
+     (respec 'diredp-date-time :inherit 'font-lock-comment-face)
+     (respec 'diredp-dir-heading :inherit 'org-block-begin-line)
+     (respec 'diredp-dir-name :inherit 'dired-directory)
+     (respec 'diredp-file-name :inherit 'default)
+     (respec 'diredp-number :inherit 'font-lock-constant-face)
+     (respec 'diredp-flag-mark :inherit 'highlight)
+     (respec 'diredp-flag-mark-line :inherit 'highlight)
+     (respec 'diredp-deletion :inherit 'warning)
+     (respec 'diredp-deletion-file-name :inherit 'warning)
+     (respec 'diredp-dir-priv :inherit 'dired-directory)
+     (respec 'diredp-read-priv :inherit 'rainbow-delimiters-depth-1-face)
+     (respec 'diredp-write-priv :inherit 'rainbow-delimiters-depth-2-face)
+     (respec 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-5-face))))
+#+END_SRC
+
+Dired narrow is a handy tool to filter the files in a dired buffer.
+#+BEGIN_SRC emacs-lisp
+(setup dired-narrow
+  (:ensure t)
+  (:config
+   (define-key dired-mode-map (kbd "C-x /") 'dired-narrow)))
 #+END_SRC
 
 Sometimes one wishes to perform quick conversions from one file type to another,
@@ -729,6 +807,7 @@ lowered.
   (:config
    (setq font-lock-maximum-decoration (quote ((c++-mode . 2) (t . t))))))
 #+END_SRC
+
 ** Common Lisp
 #+BEGIN_SRC emacs-lisp
 (setup slime-company
@@ -771,6 +850,7 @@ lowered.
 
    'override-slime-repl-bindings-with-paredit))
 #+END_SRC
+
 ** Emacs Lisp
 The language Emacs Lisp is a fine blend of Maclisp, Common Lisp and some
 language for editing text. Unsurprisingly Emacs is well suited for editing
@@ -830,6 +910,7 @@ With a prefix argument, perform `macroexpand-all' instead."
    (add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
    (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)))
 #+END_SRC
+
 ** Maxima
 #+BEGIN_SRC emacs-lisp
 (setup maxima-mode
@@ -848,6 +929,7 @@ With a prefix argument, perform `macroexpand-all' instead."
 ")
    (setq imaxima-scale-factor 1.4)))
 #+END_SRC
+
 ** Scheme Programming
 #+BEGIN_SRC emacs-lisp
 (setup geiser
@@ -863,6 +945,7 @@ With a prefix argument, perform `macroexpand-all' instead."
    (add-hook 'scheme-mode-hook 'enable-company-mode)
    (add-hook 'scheme-mode-hook 'rainbow-delimiters-mode)))
 #+END_SRC
+
 ** Octave like languages
 There is a whole family of programming toolkits for applied mathematics,
 all with similar syntax as Octave.
@@ -870,6 +953,7 @@ all with similar syntax as Octave.
 (setup octave-mode
   (:mode "\\.sci\\'" "\\.m\\'"))
 #+END_SRC
+
 ** Proof General
 Proof General is an Emacs frontend for various Theorem Provers.
 #+BEGIN_SRC emacs-lisp
@@ -881,6 +965,7 @@ Proof General is an Emacs frontend for various Theorem Provers.
    (add-hook 'proof-ready-for-assistant-hook
              (lambda () (show-paren-mode 0)))))
 #+END_SRC
+
 ** EAP - Music Without Jolts
 #+BEGIN_SRC emacs-lisp
 (setup eap
@@ -902,6 +987,7 @@ Proof General is an Emacs frontend for various Theorem Provers.
    (add-hook 'kill-buffer-hook
              'eap-always-kill-buffer-cleanly)))
 #+END_SRC
+
 * User Interface
 This chapter is concerned with the interaction between Emacs and human
 beings. The aim is to provide a very distraction free environment for the
@@ -995,9 +1081,9 @@ Now some customization of the hilighting of matching parentheses.
 (setup paren
   (:config
    (setq show-paren-delay 0
-         blink-matching-paren nil)
-   (show-paren-mode)
-   (setq show-paren-style 'expression)))
+         blink-matching-paren nil
+         show-paren-style 'parenthesis)
+   (show-paren-mode)))
 #+END_SRC
 
 Visually indicate the two major sins in programming: tabs and trailing
@@ -1028,54 +1114,38 @@ org-crypt mode does not work well with auto-save.
          backup-directory-alist (quote (("." . "~/.emacs.d/saves")))
          backup-inhibited nil)))
 #+END_SRC
+
 ** The Color Theme
-The Zenburn color theme is pleasant to view, even for long coding
-sessions. This configuration uses a slightly modified Zenburn theme.
+This is the color theme from the [[https://www.spacemacs.org][Spacemacs]] project with very minor
+modifications.
 
 #+BEGIN_SRC emacs-lisp
-(setup zenburn-theme
-  ;(:ensure t)
-  (:config
-   (load-theme 'zenburn t)
-
-   ;; (face-spec-set
-   ;;  'default
-   ;;  '((t (:inherit
-   ;;        nil
-   ;;        :stipple nil
-   ;;        :background "#3F3F3F"
-   ;;        :foreground "#DCDCCC"
-   ;;        :inverse-video nil
-   ;;        :box nil
-   ;;        :strike-through nil
-   ;;        :overline nil
-   ;;        :underline nil
-   ;;        :slant normal
-   ;;        :weight normal
-   ;;        :height 110
-   ;;        :width normal
-   ;;        :foundry "unknown"
-   ;;        :family "Mono"))))
-
-   ;; otherwise too many attributes are overwritten by show-paren
-   (face-spec-set
-    'show-paren-match
-    '((t (:foreground unspecified
-          :weight unspecified))))
-
-   (face-spec-set
-    'button
-    '((t (:inherit link))))))
-#+END_SRC
-
-The package `powerline' makes the Emacs mode line more beautiful.
-
-#+BEGIN_SRC emacs-lisp
-(setup powerline
+(setup spacemacs-theme
   (:ensure t)
   (:config
-   (powerline-center-evil-theme)
-   (setq powerline-arrow-shape 'curve)))
+   ;; The spacemacs theme tries to detect whether to give the full color
+   ;; theme or a restricted version. This fails for the Emacs server, so I
+   ;; disable this check
+   (defun always-true (&rest args) t)
+
+   (defun load-spacemacs-theme (&optional frame)
+     (advice-add 'true-color-p :around #'always-true)
+     (load-theme 'spacemacs-dark t)
+     (advice-remove 'true-color-p #'always-true))
+
+   (load-spacemacs-theme)))
+#+END_SRC
+
+The package `powerline' and its derivative `spaceline' make the Emacs mode
+line more beautiful.
+
+#+BEGIN_SRC emacs-lisp
+(setup spaceline
+  (:ensure t)
+  (:config
+   (require 'spaceline-config)
+   (setf powerline-default-separator 'wave)
+   (spaceline-spacemacs-theme)))
 #+END_SRC
 
 ** Keybindings
@@ -1230,6 +1300,7 @@ started. The list contains mostly directories.
      (find-file "~/userdata/events/*" t))
    (setq initial-buffer-choice "~/userdata")))
 #+END_SRC
+
 ** Cleanup the Mode Line with Diminish
 There are some modes that are so omnipresent that they deserve no special
 mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminish' gets rid of them.
@@ -1269,3 +1340,10 @@ There are many modes that would profit from company completion and do not
 at the moment.
 *** TODO review auto saving
 Probably it would be useful to re-enable auto-save in some way
+*** TODO use Helm
+*** TODO borrow spacemacs config
+Especially the major mode setup
+*** TODO fix theme bug
+The Emacs server starts without an X-window and therefore enables the
+terminal color theme of spacemacs.
+*** TODO use spaceline

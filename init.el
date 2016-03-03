@@ -8,11 +8,11 @@
   (kill-buffer))
 
 ;; make `load' skip the rest of this file
-(setq load-read-function
+(setf load-read-function
       (lambda (&optional stream)
         (set-buffer stream)
         (goto-char (point-max))
-        '(setq load-read-function nil)))
+        '(setf load-read-function nil)))
 #+END_SRC
 
 #+TITLE: Marco Heisig's Emacs configuration
@@ -150,7 +150,7 @@ Melpa and the Org mode archives.
          (normal-top-level-add-to-load-path '("."))
          (normal-top-level-add-subdirs-to-load-path))))
 
-   (setq package-archives
+   (setf package-archives
          '(("gnu" . "http://elpa.gnu.org/packages/")
            ("melpa" . "https://melpa.org/packages/")
            ("org" . "http://orgmode.org/elpa/")))
@@ -170,7 +170,7 @@ information is stored in another independent file.
 #+BEGIN_SRC emacs-lisp
 (setup custom
   (:config
-   (setq custom-file "~/.emacs.d/custom.el")
+   (setf custom-file "~/.emacs.d/custom.el")
    (load custom-file)))
 #+END_SRC
 
@@ -216,20 +216,20 @@ section describes how to set it up.
   (:ensure t)
   (:config
    (evil-mode 1)
-   (setq evil-want-C-w-in-emacs-state t)
-   (setq evil-echo-state nil)
-   (setq evil-cjk-emacs-word-boundary t)
-   (setq evil-want-C-i-jump nil)
-   (setq evil-want-C-w-delete nil)
+   (setf evil-want-C-w-in-emacs-state t)
+   (setf evil-echo-state nil)
+   (setf evil-cjk-emacs-word-boundary t)
+   (setf evil-want-C-i-jump nil)
+   (setf evil-want-C-w-delete nil)
 
-   (setq evil-emacs-state-tag " Ⓔ ")
-   (setq evil-normal-state-tag " Ⓝ ")
-   (setq evil-insert-state-tag " Ⓘ ")
-   (setq evil-motion-state-tag " Ⓜ ")
-   (setq evil-multiedit-insert-state-tag " ∀Ⓘ ")
-   (setq evil-multiedit-state-tag " ∀Ⓝ ")
-   (setq evil-operator-state-tag " Ⓞ ")
-   (setq evil-visual-state-tag " Ⓥ ")))
+   (setf evil-emacs-state-tag " Ⓔ ")
+   (setf evil-normal-state-tag " Ⓝ ")
+   (setf evil-insert-state-tag " Ⓘ ")
+   (setf evil-motion-state-tag " Ⓜ ")
+   (setf evil-multiedit-insert-state-tag " ∀Ⓘ ")
+   (setf evil-multiedit-state-tag " ∀Ⓝ ")
+   (setf evil-operator-state-tag " Ⓞ ")
+   (setf evil-visual-state-tag " Ⓥ ")))
 #+END_SRC
 
 ** Recording Emacs sessions with Camcorder
@@ -259,7 +259,7 @@ many video formats.
 (setup bbdb
   (:ensure t)
   (:config
-   (setq bbdb-default-country "Germany"
+   (setf bbdb-default-country "Germany"
          bbdb-file "~/.emacs.d/bbdb"
          bbdb-gui t
          bbdb-north-american-phone-numbers-p nil)
@@ -344,7 +344,7 @@ preferences.
   (:ensure t)
   (:config
    (openwith-mode)
-   (setq openwith-associations
+   (setf openwith-associations
          ;; note: no openwith-opening of .ps files or imaxima misbehaves
          '(("\\.\\(?:dvi\\|pdf\\|ps.gz\\|djvu\\)\\'"
             "evince" (file))
@@ -366,7 +366,7 @@ with multiple grouping constructs.
 #+BEGIN_SRC emacs-lisp
 (setup re-builder
   (:config
-   (setq reb-re-syntax 'read)))
+   (setf reb-re-syntax 'read)))
 #+END_SRC
 
 ** Bibliographic References with Reftex
@@ -379,7 +379,7 @@ with multiple grouping constructs.
      (and (buffer-file-name) (file-exists-p (buffer-file-name))
           (progn
             ;; Reftex should use the org file as master file. See C-h v TeX-master for infos.
-            (setq TeX-master t)
+            (setf TeX-master t)
             (turn-on-reftex)
             (reftex-parse-all)
             ;; add a custom reftex cite format to insert links
@@ -422,20 +422,20 @@ between organizing, note taking and programming in amazing ways.
 (setup org-plus-contrib
   (:ensure t)
   (:init
-   (setq org-export-backends '(ascii html icalendar latex beamer odt)))
+   (setf org-export-backends '(ascii html icalendar latex beamer odt)))
   (:config
-   (setq org-adapt-indentation nil)
-   (setq org-agenda-window-setup (quote current-window))
-   (setq org-catch-invisible-edits 'show)
-   (setq org-default-notes-file "~/.emacs.d/org/notes.org")
-   (setq org-directory "~/.emacs.d/org")
-   (setq org-pretty-entities t)
-   (setq org-pretty-entities-include-sub-superscripts nil)
-   (setq org-return-follows-link t)
-   (setq org-special-ctrl-a/e nil)
-   (setq org-block-begin-line t)
-   (setq org-export-with-timestamps t)
-   (setq org-export-date-timestamp-format "%Y-%m-%d")
+   (setf org-adapt-indentation nil)
+   (setf org-agenda-window-setup (quote current-window))
+   (setf org-catch-invisible-edits 'show)
+   (setf org-default-notes-file "~/.emacs.d/org/notes.org")
+   (setf org-directory "~/.emacs.d/org")
+   (setf org-pretty-entities t)
+   (setf org-pretty-entities-include-sub-superscripts nil)
+   (setf org-return-follows-link t)
+   (setf org-special-ctrl-a/e nil)
+   (setf org-block-begin-line t)
+   (setf org-export-with-timestamps t)
+   (setf org-export-date-timestamp-format "%Y-%m-%d")
    (setcdr (assoc-string "\\.pdf\\'" org-file-apps) "evince %s")
    (setq-default org-tag-alist
                  '(("crypt" . ?c)
@@ -452,7 +452,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 #+BEGIN_SRC emacs-lisp
 (setup org-fontification-hack
   (:config
-   (setq jit-lock-chunk-size 10000)))
+   (setf jit-lock-chunk-size 10000)))
 #+END_SRC
 
 *** Organizing with Org Agenda
@@ -461,11 +461,11 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
   (:config
    (make-directory "~/.emacs.d/eap-playlists" t)
 
-   (setq org-agenda-compact-blocks nil)
-   (setq org-agenda-files "~/.emacs.d/org/agenda-files.org")
-   (setq org-agenda-include-diary t)
-   (setq org-agenda-span 'week)
-   (setq org-agenda-sticky nil)
+   (setf org-agenda-compact-blocks nil)
+   (setf org-agenda-files "~/.emacs.d/org/agenda-files.org")
+   (setf org-agenda-include-diary t)
+   (setf org-agenda-span 'week)
+   (setf org-agenda-sticky nil)
    (setq
     org-capture-templates
     '(("t" "Task - needs to be done" entry
@@ -500,13 +500,13 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 (setup org-plus-contrib
   (:ensure t)
   (:config
-   (setq org-latex-create-formula-image-program 'imagemagick)
-   (setq org-format-latex-options
+   (setf org-latex-create-formula-image-program 'imagemagick)
+   (setf org-format-latex-options
          (plist-put org-format-latex-options :scale 1.6))
    (add-hook 'org-mode-hook 'turn-on-org-cdlatex)
-   (setq org-latex-listings 'minted)
+   (setf org-latex-listings 'minted)
    (add-to-list 'org-latex-packages-alist '("" "minted"))
-   (setq org-latex-minted-options
+   (setf org-latex-minted-options
          '(("frame" "single") ("framesep" "6pt")
            ("mathescape" "true") ("fontsize" "\\footnotesize")))
    (setq
@@ -526,7 +526,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 (setup org-plus-contrib
   (:ensure t)
   (:config
-   (setq org-edit-src-content-indentation 0)
+   (setf org-edit-src-content-indentation 0)
    (org-babel-do-load-languages
     'org-babel-load-languages
     '((asymptote . t)
@@ -555,9 +555,9 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
       (scheme . t)
       (screen . t)
       (sh . t)))
-   (setq org-src-preserve-indentation nil)
-   (setq org-src-tab-acts-natively t)
-   (setq org-src-window-setup 'other-window)
+   (setf org-src-preserve-indentation nil)
+   (setf org-src-tab-acts-natively t)
+   (setf org-src-window-setup 'other-window)
    (setq-default org-export-babel-evaluate 'inline-only)))
 #+END_SRC
 
@@ -585,10 +585,10 @@ buffers.
 (setup org-crypt
   (:config
    (require 'org-crypt)
-   (setq auto-save-default nil)
+   (setf auto-save-default nil)
    (org-crypt-use-before-save-magic)
-   (setq org-tags-exclude-from-inheritance '("crypt"))
-   (setq org-crypt-key "05369722")))
+   (setf org-tags-exclude-from-inheritance '("crypt"))
+   (setf org-crypt-key "05369722")))
 #+END_SRC
 
 *** Beautiful Presentations with Org Reveal
@@ -610,7 +610,7 @@ drill session.
 (setup org-drill
   (:config
    ;; prevent drill hints from ruining Latex formulas
-   (setq org-drill-hint-separator "||HINT||")))
+   (setf org-drill-hint-separator "||HINT||")))
 #+END_SRC
 
 ** Latex Editing with Auctex
@@ -632,7 +632,7 @@ adjacent [[info:Emacs#Windows][Emacs windows]].
 #+BEGIN_SRC emacs-lisp
 (setup dired
   (:config
-   (setq dired-dwim-target t
+   (setf dired-dwim-target t
          dired-recursive-copies 'top
          dired-listing-switches "-ahl"
          dired-auto-revert-buffer t
@@ -786,7 +786,7 @@ AWK code.
 (setup c-mode
   (:mode "\\.cl\\'" "\\.frag\\'" "\\.vert\\'")
   (:config
-   (setq c-basic-offset 4
+   (setf c-basic-offset 4
          c-hanging-braces-alist (quote set-from-style)
          c-offsets-alist (quote ((innamespace . 0))))))
 
@@ -803,7 +803,7 @@ lowered.
 #+BEGIN_SRC emacs-lisp
 (setup c++-font-lock
   (:config
-   (setq font-lock-maximum-decoration (quote ((c++-mode . 2) (t . t))))))
+   (setf font-lock-maximum-decoration (quote ((c++-mode . 2) (t . t))))))
 #+END_SRC
 
 ** Common Lisp
@@ -814,7 +814,7 @@ lowered.
 (setup slime
   (:ensure t)
   (:config
-   (setq inferior-lisp-program "sbcl")
+   (setf inferior-lisp-program "sbcl")
    (slime-setup
     '(slime-fancy
       slime-cl-indent
@@ -861,7 +861,7 @@ stepper called `macroexpand-point'.
    (define-derived-mode emacs-lisp-macroexpand-mode emacs-lisp-mode
      "Macro Expansion"
      "Major mode for displaying Emacs Lisp macro expansions."
-     (setq buffer-read-only t))
+     (setf buffer-read-only t))
 
    (define-key emacs-lisp-mode-map
      (kbd "C-c m") 'macroexpand-point)
@@ -919,14 +919,14 @@ With a prefix argument, perform `macroexpand-all' instead."
   (:config
    ;; This is a little bugfix, otherwise imaxima decided the equation color
    ;; was NIL and would fail
-   (setq imaxima-equation-color "#DCDCCC")
+   (setf imaxima-equation-color "#DCDCCC")
 
-   (setq imaxima-use-maxima-mode-flag t)
-   (setq imaxima-latex-preamble "
+   (setf imaxima-use-maxima-mode-flag t)
+   (setf imaxima-latex-preamble "
 \\usepackage{concrete}
 \\usepackage{euler}
 ")
-   (setq imaxima-scale-factor 1.4)))
+   (setf imaxima-scale-factor 1.4)))
 #+END_SRC
 
 ** Scheme Programming
@@ -934,12 +934,12 @@ With a prefix argument, perform `macroexpand-all' instead."
 (setup geiser
   (:ensure t)
   (:config
-   (setq geiser-default-implementation "guile")))
+   (setf geiser-default-implementation "guile")))
 
 (setup scheme-mode
   (:mode "\\.sc\\'")
   (:config
-   (setq scheme-program-name "guile")
+   (setf scheme-program-name "guile")
    (add-hook 'scheme-mode-hook 'enable-paredit-mode)
    (add-hook 'scheme-mode-hook 'enable-company-mode)
    (add-hook 'scheme-mode-hook 'rainbow-delimiters-mode)))
@@ -972,14 +972,14 @@ Proof General is an Emacs frontend for various Theorem Provers.
   (:config
    (make-directory "~/.emacs.d/eap-playlists" t)
 
-   (setq eap-music-library
+   (setf eap-music-library
          "~/userdata/music")
-   (setq eap-playlist-library
+   (setf eap-playlist-library
          "~/.emacs.d/eap-playlists")
 
-   (setq eap-volume-mute 0.00)
+   (setf eap-volume-mute 0.00)
 
-   (setq eap-volume-fade-out-flag nil)
+   (setf eap-volume-fade-out-flag nil)
 
    (add-hook 'kill-buffer-hook
              'eap-always-kill-buffer-cleanly)
@@ -1000,32 +1000,32 @@ Emacs variable and function, respectively.
 #+BEGIN_SRC emacs-lisp
 (setup simple-modifications
   (:config
-   (setq user-full-name "Marco Heisig")
-   (setq user-mail-address "marco.heisig@fau.de")
-   (setq frame-title-format "%b - Emacs")
-   (setq large-file-warning-threshold (* 1000 1000 400))
-   (setq read-file-name-completion-ignore-case t)
-   (setq read-buffer-completion-ignore-case t)
-   (setq visible-bell nil)
-   (setq ring-bell-function (lambda ())) ; AKA do nothing
+   (setf user-full-name "Marco Heisig")
+   (setf user-mail-address "marco.heisig@fau.de")
+   (setf frame-title-format "%b - Emacs")
+   (setf large-file-warning-threshold (* 1000 1000 400))
+   (setf read-file-name-completion-ignore-case t)
+   (setf read-buffer-completion-ignore-case t)
+   (setf visible-bell nil)
+   (setf ring-bell-function (lambda ())) ; AKA do nothing
    (prefer-coding-system 'utf-8)
-   (setq save-abbrevs nil)
-   (setq browse-url-browser-function 'browse-url-chromium)
+   (setf save-abbrevs nil)
+   (setf browse-url-browser-function 'browse-url-chromium)
    (column-number-mode 1)
-   (setq echo-keystrokes 0.01)
+   (setf echo-keystrokes 0.01)
    (setq-default fill-column 75)
-   (setq inhibit-startup-screen t)
+   (setf inhibit-startup-screen t)
    (setq-default truncate-lines t)
    (setq-default initial-major-mode 'org-mode)
    (setq-default major-mode 'org-mode)
-   (setq require-final-newline t)
+   (setf require-final-newline t)
    (setq-default indent-tabs-mode nil)
    (setq-default tab-width 4)
-   (setq indicate-buffer-boundaries nil)
-   (setq fringe-mode 4)
+   (setf indicate-buffer-boundaries nil)
+   (setf fringe-mode 4)
    (setq-default indicate-empty-lines t)
-   (setq initial-scratch-message nil)
-   (setq pop-up-frames nil)))
+   (setf initial-scratch-message nil)
+   (setf pop-up-frames nil)))
 #+END_SRC
 
 Emacs wizards have memoized all their commands and have no need for visual
@@ -1067,7 +1067,7 @@ time. Second, a prompt for interactive confirmation requires the user to type
 #+BEGIN_SRC emacs-lisp
 (setup annoyances
   (:config
-   (setq kill-buffer-query-functions
+   (setf kill-buffer-query-functions
          (remq 'process-kill-buffer-query-function
                kill-buffer-query-functions))
 
@@ -1079,7 +1079,7 @@ Now some customization of the hilighting of matching parentheses.
 #+BEGIN_SRC emacs-lisp
 (setup paren
   (:config
-   (setq show-paren-delay 0
+   (setf show-paren-delay 0
          blink-matching-paren nil
          show-paren-style 'parenthesis)
    (show-paren-mode)))
@@ -1091,7 +1091,7 @@ whitespace.
 #+BEGIN_SRC emacs-lisp
 (setup whitespace
   (:config
-   (setq whitespace-style '(face trailing tab-mark))
+   (setf whitespace-style '(face trailing tab-mark))
    (global-whitespace-mode)))
 #+END_SRC
 
@@ -1108,7 +1108,7 @@ org-crypt mode does not work well with auto-save.
 #+BEGIN_SRC emacs-lisp
 (setup auto-save
   (:config
-   (setq auto-save-default nil
+   (setf auto-save-default nil
          auto-save-list-file-prefix "~/.emacs.d/auto-save/save-"
          backup-directory-alist (quote (("." . "~/.emacs.d/saves")))
          backup-inhibited nil)))
@@ -1166,7 +1166,7 @@ background to illustrate the block structure.
 #+BEGIN_SRC emacs-lisp
 (setup org-src-fontification
   (:config
-   (setq org-src-fontify-natively t)
+   (setf org-src-fontify-natively t)
 
    (defun org-src-fontification--after (lang start end)
      (remove-text-properties start end '(:background nil))
@@ -1188,8 +1188,8 @@ convenient key chord is `jk'.
   (:ensure t)
   (:config
    (key-chord-mode 1)
-   (setq key-chord-two-keys-delay 0.05)
-   (setq key-chord-one-key-delay 0.14)
+   (setf key-chord-two-keys-delay 0.05)
+   (setf key-chord-one-key-delay 0.14)
 
    (key-chord-define global-map
                      "jk" 'quit-window)
@@ -1324,7 +1324,7 @@ started. The list contains mostly directories.
      (find-file "~/userdata/*" t)
      (find-file "~/userdata/proj/*" t)
      (find-file "~/userdata/events/*" t))
-   (setq initial-buffer-choice "~/userdata")))
+   (setf initial-buffer-choice "~/userdata")))
 #+END_SRC
 
 ** Cleanup the Mode Line with Diminish
@@ -1359,9 +1359,6 @@ try. Maybe I should wait for Emacs Xwidgets support...
 *** TODO proofgeneral and show-paren
 For magic reasons, it is not possible to activate show-paren-mode in
 proofgeneral.
-*** TODO battery
-I would really like a single character that shows whether I charge,
-discharge and how fast this happens
 *** TODO enable company in more modes
 There are many modes that would profit from company completion and do not
 at the moment.

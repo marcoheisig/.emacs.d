@@ -4,7 +4,8 @@
   (package-initialize)
   (find-file-existing load-file-name)
   (let ((org-confirm-babel-evaluate nil))
-    (org-babel-execute-buffer)))
+    (org-babel-execute-buffer))
+  (kill-buffer))
 
 ;; make `load' skip the rest of this file
 (setq load-read-function
@@ -51,6 +52,13 @@ you are reading this file from Emacs)
 #+BEGIN_SRC emacs-lisp :eval no
 ;; place cursor after the final `)' and press C-x C-e to evaluate
 (occur "\\(marco\\|heisig\\|org-crypt-key\\|country\\|phone\\)")
+#+END_SRC
+
+Final hint: This configuration is not optimized for load time. It is
+strongly recommended to use Emacs as a server. This is as simple as using
+the following command to launch a session:
+#+BEGIN_SRC sh :eval no
+emacsclient -n -c -a ""
 #+END_SRC
 
 * Meta Configuration
@@ -229,8 +237,12 @@ many video formats.
 
 ** Monitoring the Battery
 #+BEGIN_SRC emacs-lisp
-(setup fancy-battery
-  (:ensure t))
+(setup battery
+  (:ensure t)
+  (:config
+   (setf battery-mode-line-format "🔋 %p")
+   (setf battery-update-interval 5)
+   (display-battery-mode 1)))
 #+END_SRC
 
 ** The Insidious Big Brother Database for Emacs
@@ -540,31 +552,6 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
    (setq-default org-export-babel-evaluate 'inline-only)))
 #+END_SRC
 
-Org mode presents two options for rendering source code blocks. The default
-one is to use the `org-block' face. The other one can be activated by
-setting `org-src-fontify-natively' to a non-nil value and displays the code
-according to the major mode of its language. The approach here is a hybrid
-solution that first uses native fontification, but the applies a different
-background to illustrate the block structure.
-
-#+BEGIN_SRC emacs-lisp
-(setq org-src-fontify-natively t)
-
-(defun org-src-fontification--around (lang start end)
-  (let ((bg-color (color-darken-name
-                   (or (face-background 'org-block-begin-line)
-                       (face-background 'default)
-                       "#FFFFFF")
-                   2.0)))
-
-    (add-face-text-property
-     start end `(background-color . ,bg-color))))
-
-(advice-add 'org-src-font-lock-fontify-block
-            :after #'org-src-fontification--around)
-
-#+END_SRC
-
 The org-src minor mode allows to edit a single source code block in a
 separate buffer. It is convenient to have the same evil state in both
 buffers.
@@ -670,7 +657,9 @@ adjacent [[info:Emacs#Windows][Emacs windows]].
      (respec 'diredp-dir-priv :inherit 'dired-directory)
      (respec 'diredp-read-priv :inherit 'rainbow-delimiters-depth-1-face)
      (respec 'diredp-write-priv :inherit 'rainbow-delimiters-depth-2-face)
-     (respec 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-5-face))))
+     (respec 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-5-face)
+     (respec 'diredp-link-priv :inherit 'default)
+     (respec 'diredp-rare-priv :inherit 'default))))
 #+END_SRC
 
 Dired narrow is a handy tool to filter the files in a dired buffer.
@@ -908,6 +897,7 @@ With a prefix argument, perform `macroexpand-all' instead."
 
    (add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
    (add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
+   (add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
    (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)))
 #+END_SRC
 
@@ -1115,7 +1105,7 @@ org-crypt mode does not work well with auto-save.
          backup-inhibited nil)))
 #+END_SRC
 
-** The Color Theme
+** The Color Theme and Modeline
 This is the color theme from the [[https://www.spacemacs.org][Spacemacs]] project with very minor
 modifications.
 
@@ -1133,7 +1123,16 @@ modifications.
      (load-theme 'spacemacs-dark t)
      (advice-remove 'true-color-p #'always-true))
 
-   (load-spacemacs-theme)))
+   (load-spacemacs-theme)
+
+   (set-face-foreground
+    'font-lock-regexp-grouping-backslash
+    "#164638")
+
+   (set-face-foreground
+    'font-lock-regexp-grouping-construct
+    "SeaGreen2")
+   ))
 #+END_SRC
 
 The package `powerline' and its derivative `spaceline' make the Emacs mode
@@ -1146,6 +1145,26 @@ line more beautiful.
    (require 'spaceline-config)
    (setf powerline-default-separator 'wave)
    (spaceline-spacemacs-theme)))
+#+END_SRC
+
+Org mode presents two options for rendering source code blocks. The default
+one is to use the `org-block' face. The other one can be activated by
+setting `org-src-fontify-natively' to a non-nil value and displays the code
+according to the major mode of its language. The approach here is a hybrid
+solution that first uses native fontification, but the applies a different
+background to illustrate the block structure.
+
+#+BEGIN_SRC emacs-lisp
+(setup org-src-fontification
+  (:config
+   (setq org-src-fontify-natively t)
+
+   (defun org-src-fontification--after (lang start end)
+     (remove-text-properties start end '(:background nil))
+     (add-face-text-property start end '(:background "#312b3a")))
+
+   (advice-add 'org-src-font-lock-fontify-block
+               :after #'org-src-fontification--after)))
 #+END_SRC
 
 ** Keybindings
@@ -1292,8 +1311,6 @@ started. The list contains mostly directories.
   (:config
    (save-excursion
      (find-file-existing "~/.emacs.d/")
-     (find-file-existing "~/.emacs.d/init.el")
-     (revert-buffer nil t) ;; apply org-indent retroactively
      (find-file "~/userdata/gaming/*" t)
      (find-file "~/userdata/*" t)
      (find-file "~/userdata/proj/*" t)
@@ -1311,6 +1328,7 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
    (diminish 'paredit-mode)
    (diminish 'global-whitespace-mode)
    (diminish 'company-mode)
+   (diminish 'rainbow-mode)
    (diminish 'yas-minor-mode)
    (diminish 'undo-tree-mode)
    (diminish 'grab-and-drag-mode)
@@ -1340,10 +1358,5 @@ There are many modes that would profit from company completion and do not
 at the moment.
 *** TODO review auto saving
 Probably it would be useful to re-enable auto-save in some way
-*** TODO use Helm
 *** TODO borrow spacemacs config
-Especially the major mode setup
-*** TODO fix theme bug
-The Emacs server starts without an X-window and therefore enables the
-terminal color theme of spacemacs.
-*** TODO use spaceline
+Especially the major mode setup and helm

@@ -220,7 +220,16 @@ section describes how to set it up.
    (setq evil-echo-state nil)
    (setq evil-cjk-emacs-word-boundary t)
    (setq evil-want-C-i-jump nil)
-   (setq evil-want-C-w-delete nil)))
+   (setq evil-want-C-w-delete nil)
+
+   (setq evil-emacs-state-tag " Ⓔ ")
+   (setq evil-normal-state-tag " Ⓝ ")
+   (setq evil-insert-state-tag " Ⓘ ")
+   (setq evil-motion-state-tag " Ⓜ ")
+   (setq evil-multiedit-insert-state-tag " ∀Ⓘ ")
+   (setq evil-multiedit-state-tag " ∀Ⓝ ")
+   (setq evil-operator-state-tag " Ⓞ ")
+   (setq evil-visual-state-tag " Ⓥ ")))
 #+END_SRC
 
 ** Recording Emacs sessions with Camcorder

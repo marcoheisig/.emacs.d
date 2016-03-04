@@ -1118,6 +1118,65 @@ org-crypt mode does not work well with auto-save.
 #+END_SRC
 
 ** The Color Theme and Modeline
+This chapter deals with the visual appearance of Emacs. Interested readers
+might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
+
+The most important coloring concept is the notion of [[info:Elisp#faces][Faces]]. These are
+attributes attached to each character that determine its appearance. The
+following code computes some faces relative to existing colors each time a
+color theme is loaded.
+
+#+BEGIN_SRC emacs-lisp
+(setup derived-faces
+  (:config
+   (defun update-derived-faces (&rest args)
+     (cl-labels
+         ((hsl
+           (color-name)
+           (apply #'color-rgb-to-hsl
+                  (color-name-to-rgb color-name)))
+          (combine-colors
+           (wh1 ws1 wl1 color1 wh2 ws2 wl2 color2)
+           (cl-multiple-value-bind (h1 s1 l1) (hsl color1)
+             (cl-multiple-value-bind (h2 s2 l2) (hsl color2)
+               (apply
+                #'color-rgb-to-hex
+                (color-hsl-to-rgb
+                 (color-clamp (+ (* wh1 h1) (* wh2 h2)))
+                 (color-clamp (+ (* ws1 s1) (* ws2 s2)))
+                 (color-clamp (+ (* wl1 l1) (* wl2 l2)))))))))
+       (redraw-display) ;; make theme change actually happen
+       (let ((default-bg (face-background 'default))
+             (string-fg (face-foreground
+                         'font-lock-string-face
+                         nil 'default))
+             (block-bg (face-background
+                        'org-block-begin-line
+                        nil 'default)))
+         (face-spec-set
+          'org-block-bg
+          `((t :background
+               ,(combine-colors
+                 0.0 0.3 0.3 default-bg
+                 1.0 0.7 0.7 block-bg))))
+
+         (face-spec-set
+          'font-lock-regexp-grouping-backslash
+          `((t :foreground
+               ,(combine-colors
+                 0.0 0.5 0.5 default-bg
+                 1.0 0.5 0.5 string-fg))))
+
+         (face-spec-set
+          'font-lock-regexp-grouping-construct
+          `((t :foreground
+               ,(combine-colors
+                 0.0 0.5 0.75 default-bg
+                 1.0 0.5 0.75 string-fg)))))))
+
+   (advice-add 'load-theme :after #'update-derived-faces)))
+#+END_SRC
+
 This is the color theme from the [[https://www.spacemacs.org][Spacemacs]] project with very minor
 modifications.
 
@@ -1135,25 +1194,7 @@ modifications.
      (load-theme 'spacemacs-dark t)
      (advice-remove 'true-color-p #'always-true))
 
-   (load-spacemacs-theme)
-
-   (set-face-foreground
-    'font-lock-regexp-grouping-backslash
-    "#164638")
-
-   (set-face-foreground
-    'font-lock-regexp-grouping-construct
-    "SeaGreen2")))
-#+END_SRC
-
-Setting the default font.
-
-#+BEGIN_SRC emacs-lisp
-;; (set-face-font 'default "DejaVu Sans Mono")
-;; (set-face-font 'default "Nimbus Mono L")
-;; (set-face-font 'default "Liberation Mono")
-;; (set-face-font 'default "Droid Sans Mono")
-;; (set-face-font 'default "FreeMono")
+   (load-spacemacs-theme)))
 #+END_SRC
 
 The package `powerline' and its derivative `spaceline' make the Emacs mode
@@ -1181,15 +1222,18 @@ background to illustrate the block structure.
    (setf org-src-fontify-natively t)
 
    (defun org-src-fontification--after (lang start end)
+     (unless (facep 'org-block-bg)
+       (update-derived-faces))
      (let ((pos start) next)
        (while (and (setq next (next-single-property-change pos 'face))
                    (<= next end))
          ;; org-src occasionally places invalid faces of nil in the text
-         ;; properties, so I have to remove them again.
+         ;; properties, so I have to remove them before calling
+         ;; `add-face-text-property'.
          (unless (get-text-property pos 'face)
            (remove-text-properties pos next '(face nil)))
          (add-face-text-property
-          pos next '(:background "#312b3a"))
+          pos next 'org-block-bg)
          (setq pos next))))
 
    (advice-add 'org-src-font-lock-fontify-block
@@ -1386,3 +1430,4 @@ at the moment.
 Probably it would be useful to re-enable auto-save in some way
 *** TODO borrow spacemacs config
 Especially the major mode setup and helm
+*** TODO whitespace mode not enabled everywhere

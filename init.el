@@ -54,9 +54,10 @@ you are reading this file from Emacs)
 (occur "\\(marco\\|heisig\\|org-crypt-key\\|country\\|phone\\)")
 #+END_SRC
 
-Final hint: This configuration is not optimized for load time. It is
-strongly recommended to use Emacs as a server. This is as simple as using
-the following command to launch a session:
+A final remark -- this configuration is not optimized for load time. It is
+therefore strongly recommended to use Emacs as a server, which is as simple
+as using the following command to launch a session:
+
 #+BEGIN_SRC sh :eval no
 emacsclient -n -c -a ""
 #+END_SRC
@@ -186,7 +187,9 @@ showing the true nature of the undo history as a tree with suitable
 navigation commands.
 #+BEGIN_SRC emacs-lisp
 (setup undo-tree
-  (:ensure t))
+  (:ensure t)
+  (:config
+   (setf undo-tree-visualizer-timestamps t)))
 #+END_SRC
 
 ** Rainbow delimiters
@@ -777,7 +780,7 @@ files or the file under the cursor if the former is empty."
 (define-key dired-mode-map (kbd "Z") 'dired-convert)
 #+END_SRC
 
-** The Cee Langugage Family
+** The C Langugage Family
 [[info:ccmode#Top][cc-mode]] is a GNU Emacs mode for editing files containing C, C++,
 Objective-C, Java, CORBA IDL (and the variants PSDL and CIDL), Pike and
 AWK code.
@@ -1020,7 +1023,7 @@ Emacs variable and function, respectively.
    (setq-default major-mode 'org-mode)
    (setf require-final-newline t)
    (setq-default indent-tabs-mode nil)
-   (setq-default tab-width 4)
+   (setq-default tab-width 8)
    (setf indicate-buffer-boundaries nil)
    (setf fringe-mode 4)
    (setq-default indicate-empty-lines t)
@@ -1178,8 +1181,16 @@ background to illustrate the block structure.
    (setf org-src-fontify-natively t)
 
    (defun org-src-fontification--after (lang start end)
-     ;; Throws "Invalid face reference" errors, but I don't know why...
-     (add-face-text-property start end '(:background "#312b3a")))
+     (let ((pos start) next)
+       (while (and (setq next (next-single-property-change pos 'face))
+                   (<= next end))
+         ;; org-src occasionally places invalid faces of nil in the text
+         ;; properties, so I have to remove them again.
+         (unless (get-text-property pos 'face)
+           (remove-text-properties pos next '(face nil)))
+         (add-face-text-property
+          pos next '(:background "#312b3a"))
+         (setq pos next))))
 
    (advice-add 'org-src-font-lock-fontify-block
                :after #'org-src-fontification--after)))

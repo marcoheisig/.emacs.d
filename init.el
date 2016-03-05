@@ -113,18 +113,19 @@ handle all errors that arise.
 :ensure  BOOLEAN    -- Loads the package using `package-install' if necessary
 :ensure  STRING     -- Execute STRING with `shell-command' in ~/.emacs.d/elisp/
 "
-  (cl-assert (cl-every (lambda (x) (keywordp (car x))) args) t)
-  (cl-assert (symbolp name))
-  (let ((init-forms   (cdr (assoc :init args)))
-        (config-forms (cdr (assoc :config args)))
-        (ensure-p     (cadr (assoc :ensure args)))
-        (mode-regexps (cdr (assoc :mode args))))
-    `(with-demoted-errors ,(format "Error loading %s: %%s" name)
-       ,@init-forms
-       (setup-ensure ',name ',ensure-p)
-       (setup-mode-alist ',name ',mode-regexps)
-       ,@config-forms
-       ',name)))
+  (with-demoted-errors "Error in setup form: %s"
+    (cl-assert (cl-every (lambda (x) (keywordp (car x))) args) t)
+    (cl-assert (symbolp name))
+    (let ((init-forms   (cdr (assoc :init args)))
+          (config-forms (cdr (assoc :config args)))
+          (ensure-p     (cadr (assoc :ensure args)))
+          (mode-regexps (cdr (assoc :mode args))))
+      `(with-demoted-errors ,(format "Error loading %s: %%s" name)
+         ,@init-forms
+         (setup-ensure ',name ',ensure-p)
+         (setup-mode-alist ',name ',mode-regexps)
+         ,@config-forms
+         ',name))))
 
 (put 'setup 'lisp-indent-function 'defun)
 #+END_SRC
@@ -224,6 +225,11 @@ section describes how to set it up.
    (setf evil-cjk-emacs-word-boundary t)
    (setf evil-want-C-i-jump nil)
    (setf evil-want-C-w-delete nil)
+
+   (defun enable-evil-motion-state ()
+     "Useful for major mode hooks to evable evil motion state
+unconditionally."
+     (evil-motion-state 1))
 
    (setf evil-emacs-state-tag " Ⓔ ")
    (setf evil-normal-state-tag " Ⓝ ")
@@ -1146,13 +1152,24 @@ color theme is loaded.
                  (color-clamp (+ (* ws1 s1) (* ws2 s2)))
                  (color-clamp (+ (* wl1 l1) (* wl2 l2)))))))))
        (redraw-display) ;; make theme change actually happen
-       (let ((default-bg (face-background 'default))
-             (string-fg (face-foreground
-                         'font-lock-string-face
-                         nil 'default))
-             (block-bg (face-background
-                        'org-block-begin-line
-                        nil 'default)))
+       (let* ((default-bg (face-background 'default))
+              (default-fg (face-foreground 'default))
+              (string-fg (face-foreground
+                          'font-lock-string-face
+                          nil 'default))
+              (block-bg (combine-colors
+                         1.0 1.0 0.9 default-bg
+                         0.0 0.0 0.1 default-fg)))
+
+         ;; Derive suitable colors for org-blocks
+         (face-spec-set
+          'org-block-begin-line
+          `((t :background ,block-bg)))
+
+         (face-spec-set
+          'org-block-end-line
+          `((t :background ,block-bg)))
+
          (face-spec-set
           'org-block-bg
           `((t :background
@@ -1160,6 +1177,8 @@ color theme is loaded.
                  0.0 0.3 0.3 default-bg
                  1.0 0.7 0.7 block-bg))))
 
+         ;; regexp-grouping constructs should have the same color as the
+         ;; `font-lock-string-face', but different emphasis.
          (face-spec-set
           'font-lock-regexp-grouping-backslash
           `((t :foreground
@@ -1177,10 +1196,14 @@ color theme is loaded.
    (advice-add 'load-theme :after #'update-derived-faces)))
 #+END_SRC
 
-This is the color theme from the [[https://www.spacemacs.org][Spacemacs]] project with very minor
-modifications.
+The preferred color themes of Marco Heisig.
 
 #+BEGIN_SRC emacs-lisp
+(setup zenburn-theme
+  (:ensure t)
+  (:config
+   (load-theme 'zenburn-theme)))
+
 (setup spacemacs-theme
   (:ensure t)
   (:config
@@ -1194,7 +1217,8 @@ modifications.
      (load-theme 'spacemacs-dark t)
      (advice-remove 'true-color-p #'always-true))
 
-   (load-spacemacs-theme)))
+   ;(load-spacemacs-theme)
+   ))
 #+END_SRC
 
 The package `powerline' and its derivative `spaceline' make the Emacs mode
@@ -1371,8 +1395,8 @@ Now come some humble attempts to make Emacs even more evil.
    (define-key dired-mode-map "n" 'evil-search-next)
    (define-key dired-mode-map "N" 'evil-search-previous)
 
-   (add-hook 'help-mode-hook 'evil-motion-state)
-   (add-hook 'package-menu-mode-hook 'evil-motion-state)))
+   (add-hook 'help-mode-hook 'enable-evil-motion-state)
+   (add-hook 'package-menu-mode-hook 'enable-evil-motion-state)))
 #+END_SRC
 
 ** Initial Buffers

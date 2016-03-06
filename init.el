@@ -1,11 +1,56 @@
 " -*- mode: org; coding: utf-8; no-byte-compile: t; -*-
+#+TITLE: Marco Heisig's Emacs configuration
+#+EMAIL: marco.heisig@fau.de
+#+PROPERTY: header-args:emacs-lisp :results value silent
+#+OPTIONS: H:2
+
 #+BEGIN_SRC emacs-lisp :eval no :exports none :wrap ?"
-(save-excursion
-  (package-initialize)
-  (find-file-existing load-file-name)
-  (let ((org-confirm-babel-evaluate nil))
-    (org-babel-execute-buffer))
-  (kill-buffer))
+(defvar init-errors '()
+  "A list of errors that occured during initialization. Each
+error is of the form (LINE ERROR &rest ARGS).")
+
+(defvar init-file-line 0
+  "Approximation to the currently executed line in this file.")
+
+(defmacro with-buckled-seatbelts (&rest body)
+  (let ((err (make-symbol "err")))
+    `(condition-case-unless-debug ,err
+         ,(macroexp-progn body)
+       (error
+        (push (cons init-file-line ,err)
+              init-errors)))))
+
+(package-initialize)
+(find-file-existing load-file-name)
+(let ((org-confirm-babel-evaluate nil)
+      (inhibit-redisplay t)) ; less flickering
+  (org-babel-map-executables nil
+    (unless (looking-at org-babel-lob-one-liner-regexp)
+      (setf init-file-line (line-number-at-pos))
+      (with-buckled-seatbelts
+       (org-babel-execute-src-block)))))
+(kill-buffer)
+
+(defun summarize-initialization ()
+  (let ((errors (length init-errors)))
+    (if (= 0 errors)
+        (message "Initialization successful - happy hacking.")
+      (message
+       "There have been %d errors during init:\n%s"
+       (length init-errors)
+       (mapconcat
+        (lambda (init-error)
+          (pcase-let ((`(,line ,err ,rest) init-error))
+            (format "Lines %d+: %s %s" line err rest)))
+        init-errors
+        "\n")))))
+
+;; display the summary after the spam from the emacs server
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (run-at-time
+             0.1 nil
+             #'summarize-initialization)))
 
 ;; make `load' skip the rest of this file
 (setf load-read-function
@@ -14,11 +59,6 @@
         (goto-char (point-max))
         '(setf load-read-function nil)))
 #+END_SRC
-
-#+TITLE: Marco Heisig's Emacs configuration
-#+EMAIL: marco.heisig@fau.de
-#+PROPERTY: header-args:emacs-lisp :results value silent
-#+OPTIONS: H:2
 
 * Introduction
 This is Marco Heisig's [[http://www.gnu.org/software/emacs/emacs.html][Emacs]] configuration. It is written in a Literal
@@ -113,14 +153,14 @@ handle all errors that arise.
 :ensure  BOOLEAN    -- Loads the package using `package-install' if necessary
 :ensure  STRING     -- Execute STRING with `shell-command' in ~/.emacs.d/elisp/
 "
-  (with-demoted-errors "Error in setup form: %s"
+  (with-buckled-seatbelts
     (cl-assert (cl-every (lambda (x) (keywordp (car x))) args) t)
     (cl-assert (symbolp name))
     (let ((init-forms   (cdr (assoc :init args)))
           (config-forms (cdr (assoc :config args)))
           (ensure-p     (cadr (assoc :ensure args)))
           (mode-regexps (cdr (assoc :mode args))))
-      `(with-demoted-errors ,(format "Error loading %s: %%s" name)
+      `(with-buckled-seatbelts
          ,@init-forms
          (setup-ensure ',name ',ensure-p)
          (setup-mode-alist ',name ',mode-regexps)
@@ -174,6 +214,120 @@ information is stored in another independent file.
   (:config
    (setf custom-file "~/.emacs.d/custom.el")
    (load custom-file)))
+#+END_SRC
+
+** Working with color themes
+In Emacs terminology, rendering attributes of each character are called
+[[info:Elisp#faces][Faces]]. Traditionally a color theme defines the appearance of each
+face. However hardly any color theme is exhaustive and sets colors like
+`rainbow-delimiters-depth-9-face' or `org-block-begin-line'. The following
+code derives sane values for such faces automatically. As a result, one can
+load any color theme and get a consistent experience.
+
+#+BEGIN_SRC emacs-lisp
+(setup derived-faces
+  (:config
+
+   (defun derive-faces (&rest args)
+     (cl-labels
+         ((hsl (color-name)
+               (apply #'color-rgb-to-hsl
+                      (color-name-to-rgb color-name)))
+          (hue-clamp (value)
+                     (- value (floor value)))
+          (merge-hsl
+           (wh1 ws1 wl1 color1 wh2 ws2 wl2 color2)
+           (cl-multiple-value-bind (h1 s1 l1) (hsl color1)
+             (cl-multiple-value-bind (h2 s2 l2) (hsl color2)
+               (apply
+                #'color-rgb-to-hex
+                (color-hsl-to-rgb
+                 (hue-clamp   (+ (* wh1 h1) (* wh2 h2)))
+                 (color-clamp (+ (* ws1 s1) (* ws2 s2)))
+                 (color-clamp (+ (* wl1 l1) (* wl2 l2))))))))
+          (respec (face &rest arguments)
+                  (when (member face (face-list))
+                    (face-spec-reset-face face)
+                    (apply #'set-face-attribute
+                           face nil
+                           arguments))))
+       (redraw-display) ;; make theme change actually happen
+       (let* ((default-bg (face-background 'default))
+              (default-fg (face-foreground 'default))
+              (string-fg (face-foreground
+                          'font-lock-string-face
+                          nil 'default))
+              (comment-fg (face-foreground
+                           'font-lock-comment-face
+                           nil 'default))
+              (block-bg (merge-hsl
+                         1.0 1.0 0.9 default-bg
+                         0.0 0.0 0.1 default-fg)))
+
+         ;; Derive suitable colors for org-blocks
+         (respec 'org-block-begin-line
+                 :background block-bg
+                 :foreground comment-fg)
+         (respec 'org-block-end-line
+                 :inherit 'org-block-begin-line)
+         (respec 'org-block
+                 :background (merge-hsl
+                              0.0 0.3 0.3 default-bg
+                              1.0 0.7 0.7 block-bg)
+                 :inherit 'unspecified)
+
+         ;; Make rainbow-delimiters actually a rainbow
+         (dotimes (i 9)
+           (let ((face
+                  (intern
+                   (format "rainbow-delimiters-depth-%d-face"
+                           (+ i 1)))))
+             (respec face
+                     :foreground
+                     (merge-hsl
+                      1.0 1.0 1.0 default-fg
+                      (+ 0.5 (* i 0.166)) 0.8 0.0 "#ff00ff"))))
+
+         ;; dired+ faces
+         (respec 'diredp-compressed-file-suffix :inherit 'font-lock-comment-face)
+         (respec 'diredp-file-suffix :inherit 'font-lock-comment-face)
+         (respec 'diredp-date-time :inherit 'font-lock-comment-face)
+         (respec 'diredp-dir-heading :inherit 'org-block-begin-line)
+         (respec 'diredp-dir-name :inherit 'dired-directory)
+         (respec 'diredp-symlink :inherit 'font-lock-constant-face)
+         (respec 'diredp-file-name :inherit 'default)
+         (respec 'diredp-ignored-file-name :inherit 'font-lock-comment-face)
+         (respec 'diredp-number :inherit 'font-lock-constant-face)
+         (respec 'diredp-flag-mark :inherit 'highlight)
+         (respec 'diredp-flag-mark-line :inherit 'highlight)
+         (respec 'diredp-deletion :inherit 'warning)
+         (respec 'diredp-deletion-file-name :inherit 'warning)
+         (respec 'diredp-dir-priv :inherit 'dired-directory)
+         (respec 'diredp-read-priv :inherit 'rainbow-delimiters-depth-1-face)
+         (respec 'diredp-write-priv :inherit 'rainbow-delimiters-depth-2-face)
+         (respec 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-3-face)
+         (respec 'diredp-link-priv :inherit 'default)
+         (respec 'diredp-rare-priv :inherit 'default)
+
+         ;; regexp-grouping constructs should have the same color as the
+         ;; `font-lock-string-face', but different emphasis.
+         (respec 'font-lock-regexp-grouping-backslash
+                 :foreground (merge-hsl
+                              0.0 0.5 0.5 default-bg
+                              1.0 0.5 0.5 string-fg))
+
+         (respec 'font-lock-regexp-grouping-construct
+                 :foreground (merge-hsl
+                              0.0 0.5 0.75 default-bg
+                              1.0 0.5 0.75 string-fg)
+                 :weight 'bold)
+
+         (advice-add 'load-theme :after #'derive-faces))))
+
+   (add-hook 'emacs-startup-hook
+             (lambda ()
+               ;; wait for face initialization
+               (run-at-time 0.1 nil #'derive-faces)))))
 #+END_SRC
 
 * Minor Modes
@@ -637,7 +791,6 @@ There are numerous little tweaks to enhance the dired usability. One of them is
 simply to activate dired+, another one is to enable recursive copies and enable
 `dired-dwim-target'. The latter allowes to copy and move whole folders between
 adjacent [[info:Emacs#Windows][Emacs windows]].
-
 #+BEGIN_SRC emacs-lisp
 (setup dired
   (:config
@@ -646,38 +799,13 @@ adjacent [[info:Emacs#Windows][Emacs windows]].
          dired-listing-switches "-ahl"
          dired-auto-revert-buffer t
          wdired-allow-to-change-permissions 'advanced)))
+#+END_SRC
 
+#+BEGIN_SRC emacs-lisp
 (setup dired+
   (:ensure t)
   (:config
-   (global-dired-hide-details-mode 1)
-
-   ;; Many dired+ faces are hardcoded, this code replaces them with
-   ;; meaningful other faces from the current color theme
-   (cl-flet ((respec (face &rest arguments)
-                     (apply #'set-face-attribute
-                            face nil
-                            :foreground 'unspecified
-                            :background 'unspecified
-                            arguments)))
-
-     (respec 'diredp-compressed-file-suffix :inherit 'font-lock-comment-face)
-     (respec 'diredp-file-suffix :inherit 'font-lock-string-face)
-     (respec 'diredp-date-time :inherit 'font-lock-comment-face)
-     (respec 'diredp-dir-heading :inherit 'org-block-begin-line)
-     (respec 'diredp-dir-name :inherit 'dired-directory)
-     (respec 'diredp-file-name :inherit 'default)
-     (respec 'diredp-number :inherit 'font-lock-constant-face)
-     (respec 'diredp-flag-mark :inherit 'highlight)
-     (respec 'diredp-flag-mark-line :inherit 'highlight)
-     (respec 'diredp-deletion :inherit 'warning)
-     (respec 'diredp-deletion-file-name :inherit 'warning)
-     (respec 'diredp-dir-priv :inherit 'dired-directory)
-     (respec 'diredp-read-priv :inherit 'rainbow-delimiters-depth-1-face)
-     (respec 'diredp-write-priv :inherit 'rainbow-delimiters-depth-2-face)
-     (respec 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-5-face)
-     (respec 'diredp-link-priv :inherit 'default)
-     (respec 'diredp-rare-priv :inherit 'default))))
+   (global-dired-hide-details-mode 1)))
 #+END_SRC
 
 Dired narrow is a handy tool to filter the files in a dired buffer.
@@ -1023,7 +1151,6 @@ Emacs variable and function, respectively.
    (column-number-mode 1)
    (setf echo-keystrokes 0.01)
    (setq-default fill-column 75)
-   (setf inhibit-startup-screen t)
    (setq-default truncate-lines t)
    (setq-default initial-major-mode 'org-mode)
    (setq-default major-mode 'org-mode)
@@ -1127,82 +1254,14 @@ org-crypt mode does not work well with auto-save.
 This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
 
-The most important coloring concept is the notion of [[info:Elisp#faces][Faces]]. These are
-attributes attached to each character that determine its appearance. The
-following code computes some faces relative to existing colors each time a
-color theme is loaded.
-
-#+BEGIN_SRC emacs-lisp
-(setup derived-faces
-  (:config
-   (defun update-derived-faces (&rest args)
-     (cl-labels
-         ((hsl
-           (color-name)
-           (apply #'color-rgb-to-hsl
-                  (color-name-to-rgb color-name)))
-          (combine-colors
-           (wh1 ws1 wl1 color1 wh2 ws2 wl2 color2)
-           (cl-multiple-value-bind (h1 s1 l1) (hsl color1)
-             (cl-multiple-value-bind (h2 s2 l2) (hsl color2)
-               (apply
-                #'color-rgb-to-hex
-                (color-hsl-to-rgb
-                 (color-clamp (+ (* wh1 h1) (* wh2 h2)))
-                 (color-clamp (+ (* ws1 s1) (* ws2 s2)))
-                 (color-clamp (+ (* wl1 l1) (* wl2 l2)))))))))
-       (redraw-display) ;; make theme change actually happen
-       (let* ((default-bg (face-background 'default))
-              (default-fg (face-foreground 'default))
-              (string-fg (face-foreground
-                          'font-lock-string-face
-                          nil 'default))
-              (block-bg (combine-colors
-                         1.0 1.0 0.9 default-bg
-                         0.0 0.0 0.1 default-fg)))
-
-         ;; Derive suitable colors for org-blocks
-         (face-spec-set
-          'org-block-begin-line
-          `((t :background ,block-bg)))
-
-         (face-spec-set
-          'org-block-end-line
-          `((t :background ,block-bg)))
-
-         (face-spec-set
-          'org-block-bg
-          `((t :background
-               ,(combine-colors
-                 0.0 0.3 0.3 default-bg
-                 1.0 0.7 0.7 block-bg))))
-
-         ;; regexp-grouping constructs should have the same color as the
-         ;; `font-lock-string-face', but different emphasis.
-         (face-spec-set
-          'font-lock-regexp-grouping-backslash
-          `((t :foreground
-               ,(combine-colors
-                 0.0 0.5 0.5 default-bg
-                 1.0 0.5 0.5 string-fg))))
-
-         (face-spec-set
-          'font-lock-regexp-grouping-construct
-          `((t :foreground
-               ,(combine-colors
-                 0.0 0.5 0.75 default-bg
-                 1.0 0.5 0.75 string-fg)))))))
-
-   (advice-add 'load-theme :after #'update-derived-faces)))
-#+END_SRC
-
 The preferred color themes of Marco Heisig.
 
 #+BEGIN_SRC emacs-lisp
 (setup zenburn-theme
   (:ensure t)
   (:config
-   (load-theme 'zenburn-theme)))
+   (load-theme 'zenburn)
+   (set-face-attribute 'button nil :inherit 'link)))
 
 (setup spacemacs-theme
   (:ensure t)
@@ -1246,8 +1305,6 @@ background to illustrate the block structure.
    (setf org-src-fontify-natively t)
 
    (defun org-src-fontification--after (lang start end)
-     (unless (facep 'org-block-bg)
-       (update-derived-faces))
      (let ((pos start) next)
        (while (and (setq next (next-single-property-change pos 'face))
                    (<= next end))
@@ -1257,7 +1314,7 @@ background to illustrate the block structure.
          (unless (get-text-property pos 'face)
            (remove-text-properties pos next '(face nil)))
          (add-face-text-property
-          pos next 'org-block-bg)
+          pos next 'org-block)
          (setq pos next))))
 
    (advice-add 'org-src-font-lock-fontify-block
@@ -1433,6 +1490,17 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
    (diminish 'org-cdlatex-mode)
    (diminish 'org-indent-mode)
    (diminish 'eldoc-mode)))
+#+END_SRC
+
+** Silence Emacs startup
+Emacs is by default very verbose and creates a startup screen and a echo
+message. This snippet disables both. Disabling the echo area message was
+more complicated than expected.
+
+#+BEGIN_SRC emacs-lisp
+(setf inhibit-startup-screen t)
+(advice-add 'display-startup-echo-area-message
+            :override #'ignore)
 #+END_SRC
 
 * Possible Improvements

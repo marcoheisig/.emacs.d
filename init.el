@@ -9,11 +9,47 @@ Programming style and the [[http://www.orgmode.org][Org mode]] is used to manage
 snippets.
 
 * Introduction
-** Making this file loadable
-The first few lines of this file contain magic incantations that make it
-also a valid Emacs `init.el' file. They are only interesting for seasoned
-Emacs Lisp hackers, and are therefore not exported when formatting this
-document with the Org mode.
+This file is divided into several chapters. The first chapter, [[*Meta Configuration][Meta
+Configuration]], describes how the configuration itself is loaded and how
+missing functionality is obtained with the Emacs package manager. The
+chapter [[*Minor Modes][Minor Modes]] enables and configures a plethora of secondary features
+for an amazing Emacs experience. The third chapter [[*Major Modes][Major Modes]] contains
+configuration sorted by the buffer type it applies to, like the `c-mode'
+for operating on files in the C Language. Most human computer interaction
+is placed separately in the chapter [[*User%20Interface][User Interface]]. Prominent features of
+this chapter are color themes, keybindings, undo and redo, auto completion
+and the choice of initial open buffers.
+
+A word of warning -- this configuration file is heavily centered around the
+[[https://www.emacswiki.org/emacs/Evil][Evil mode]]. Seasoned Emacs users might be surprised by the Vi-style
+keybindings. The author had to switch the layout due to pinky finger
+exhaustion. This is probably a sign of being unworthy, certainly not that
+the default Emacs keybindings are cumbersome.
+
+If you are not Marco Heisig and plan to use this configuration, some lines
+should be adapted accordingly. As a helpful starting point, all lines that
+should definitely be reviewed are those containing `marco', `heisig',
+`phone' or `crypt-key'.
+
+A final remark -- this configuration is not optimized for load time. It is
+therefore strongly recommended to use Emacs as a server, which is as simple
+as using the following command to launch a session:
+
+#+BEGIN_SRC sh :eval no
+emacsclient -n -c -a ''
+#+END_SRC
+
+* Meta Configuration
+This chapter deals with the nature of Emacs customization, hence the
+`Meta'. It manages paths in the filesystem and utility functions for all other
+chapters.
+
+** Loading this file
+These are magic incantations that make this file also a valid Emacs
+`init.el' file. They are only interesting for seasoned Emacs Lisp hackers,
+others may skip this section. For those curious how it is possible to
+`load' this file from Emacs, it may be enlightening to view this file in
+`M-x emacs-lisp-mode'.
 
 #+BEGIN_SRC emacs-lisp :eval no :export no :wrap ?"
 (defvar init.el-errors '()
@@ -31,7 +67,10 @@ error is of the form (LINE ERROR &rest ARGS).")
         (push (cons init.el-line ,err)
               init.el-errors)))))
 
-(package-initialize)
+(package-initialize) ;; in particular, load org
+(require 'cl-lib) ;; enable Common Lisp features
+
+;; now execute all relevant org-src blocks
 (find-file-existing load-file-name)
 (let ((org-confirm-babel-evaluate nil)
       (inhibit-redisplay t)) ; less flickering
@@ -48,57 +87,6 @@ error is of the form (LINE ERROR &rest ARGS).")
         (set-buffer stream)
         (goto-char (point-max))
         '(setf load-read-function nil)))
-#+END_SRC
-
-** Introduction
-The rest of this configuration file is divided into several chapters. The
-first chapter, [[*Meta Configuration][Meta Configuration]], describes how the configuration itself
-is loaded and how missing functionality is obtained via the Emacs package
-manager. The chapter [[*Minor Modes][Minor Modes]] enables and configures a plethora of
-secondary features for an amazing Emacs experience. The third chapter [[*Major Modes][Major
-Modes]] contains configuration sorted by the buffer type it applies to, like
-the `c-mode' for operating on files in the C Language. Many of those Major
-Modes also enable several Minor Modes. Most human computer interaction is
-placed separately in the chapter [[*User%20Interface][User Interface]]. Prominent features of this
-chapter are color themes, keybindings, undo and redo, auto completion and
-the choice of initial open buffers.
-
-A word of warning -- this configuration file is heavily centered around the
-[[https://www.emacswiki.org/emacs/Evil][Evil mode]]. Seasoned Emacs users might be surprised by the Vi-style
-keybindings. The author had to switch the layout due to pinky finger
-exhaustion. This is probably a sign of being unworthy, certainly not that
-the default Emacs keybindings are cumbersome.
-
-If you are not Marco Heisig and plan to use this configuration, some lines
-should be adapted accordingly. As a helpful starting point, all lines that
-should definitely be reviewed are listed by the following command (assuming
-you are reading this file from Emacs)
-
-#+BEGIN_SRC emacs-lisp :eval no
-;; place cursor after the final `)' and press C-x C-e to evaluate
-(occur "\\(marco\\|heisig\\|org-crypt-key\\|country\\|phone\\)")
-#+END_SRC
-
-A final remark -- this configuration is not optimized for load time. It is
-therefore strongly recommended to use Emacs as a server, which is as simple
-as using the following command to launch a session:
-
-#+BEGIN_SRC sh :eval no
-emacsclient -n -c -a ""
-#+END_SRC
-
-* Meta Configuration
-This chapter deals with the nature of Emacs customization, hence the
-`Meta'. It manages paths in the filesystem and utility functions for all other
-chapters.
-
-In particular, some utility functions will be presented that facilitate the
-notation in the later chapters. It would not be Emacs if the most important
-utilities were not already in place. The following code enables the [[info:CL][CL]]
-package that provides Common Lisp compatibility form Emacs.
-
-#+BEGIN_SRC emacs-lisp
-(require 'cl-lib)
 #+END_SRC
 
 ** The `setup' macro

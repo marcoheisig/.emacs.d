@@ -44,7 +44,7 @@ This chapter deals with the nature of Emacs customization, hence the
 `Meta'. It manages paths in the filesystem and utility functions for all other
 chapters.
 
-** Loading this file
+** Loading
 These are magic incantations that make this file also a valid Emacs
 `init.el' file. They are only interesting for seasoned Emacs Lisp hackers,
 others may skip this section. For those curious how it is possible to
@@ -73,7 +73,8 @@ error is of the form (LINE ERROR &rest ARGS).")
 ;; now execute all relevant org-src blocks
 (find-file-existing load-file-name)
 (let ((org-confirm-babel-evaluate nil)
-      (inhibit-redisplay t)) ; less flickering
+      (inhibit-redisplay t) ;; less flickering
+      (message-log-max nil)) ;; silence
   (org-babel-map-executables nil
     (unless (looking-at org-babel-lob-one-liner-regexp)
       (setf init.el-line (line-number-at-pos))
@@ -138,7 +139,7 @@ handle all errors that arise.
          (setup-ensure ',name ',ensure-p)
          (setup-mode-alist ',name ',mode-regexps)
          ,@config-forms
-         ',name))))
+         nil))))
 
 (put 'setup 'lisp-indent-function 'defun)
 #+END_SRC
@@ -151,27 +152,25 @@ Emacs. It seems the most useful package archives (as of 2016) for Emacs are
 Melpa and the Org mode archives.
 
 #+BEGIN_SRC emacs-lisp
-(setup package
-  (:config
-   (make-directory "~/.emacs.d/elisp/" t)
-   (make-directory "~/.emacs.d/elpa/" t)
+(make-directory "~/.emacs.d/elisp/" t)
+(make-directory "~/.emacs.d/elpa/" t)
 
-   (defun update-load-path ()
-     (save-excursion
-       (let ((default-directory "~/.emacs.d/elpa/"))
-         (normal-top-level-add-to-load-path '("."))
-         (normal-top-level-add-subdirs-to-load-path))
-       (let ((default-directory "~/.emacs.d/elisp/"))
-         (normal-top-level-add-to-load-path '("."))
-         (normal-top-level-add-subdirs-to-load-path))))
+(defun update-load-path ()
+  (save-excursion
+    (let ((default-directory "~/.emacs.d/elpa/"))
+      (normal-top-level-add-to-load-path '("."))
+      (normal-top-level-add-subdirs-to-load-path))
+    (let ((default-directory "~/.emacs.d/elisp/"))
+      (normal-top-level-add-to-load-path '("."))
+      (normal-top-level-add-subdirs-to-load-path))))
 
-   (setf package-archives
-         '(("gnu" . "http://elpa.gnu.org/packages/")
-           ("melpa" . "https://melpa.org/packages/")
-           ("org" . "http://orgmode.org/elpa/")))
+(setf package-archives
+      '(("gnu" . "http://elpa.gnu.org/packages/")
+        ("melpa" . "https://melpa.org/packages/")
+        ("org" . "http://orgmode.org/elpa/")))
 
-   (update-load-path)
-   (package-initialize)))
+(update-load-path)
+(package-initialize)
 #+END_SRC
 
 ** Customization
@@ -183,10 +182,8 @@ In order to avoid interference with custom set variables, the customize
 information is stored in another independent file.
 
 #+BEGIN_SRC emacs-lisp
-(setup custom
-  (:config
-   (setf custom-file "~/.emacs.d/custom.el")
-   (load custom-file)))
+(setf custom-file "~/.emacs.d/custom.el")
+(load custom-file)
 #+END_SRC
 
 ** Working with color themes
@@ -198,109 +195,106 @@ code derives sane values for such faces automatically. As a result, one can
 load any color theme and get a consistent experience.
 
 #+BEGIN_SRC emacs-lisp
-(setup derived-faces
-  (:config
+(defun derive-faces (&rest args)
+  (cl-labels
+      ((hsl (color-name)
+            (apply #'color-rgb-to-hsl
+                   (color-name-to-rgb color-name)))
+       (hue-clamp (value)
+                  (- value (floor value)))
+       (merge-hsl
+        (wh1 ws1 wl1 color1 wh2 ws2 wl2 color2)
+        (cl-multiple-value-bind (h1 s1 l1) (hsl color1)
+          (cl-multiple-value-bind (h2 s2 l2) (hsl color2)
+            (apply
+             #'color-rgb-to-hex
+             (color-hsl-to-rgb
+              (hue-clamp   (+ (* wh1 h1) (* wh2 h2)))
+              (color-clamp (+ (* ws1 s1) (* ws2 s2)))
+              (color-clamp (+ (* wl1 l1) (* wl2 l2))))))))
+       (respec (face &rest arguments)
+               (when (member face (face-list))
+                 (face-spec-reset-face face)
+                 (apply #'set-face-attribute
+                        face nil
+                        arguments))))
+    (redraw-display) ;; make theme change actually happen
+    (let* ((default-bg (face-background 'default))
+           (default-fg (face-foreground 'default))
+           (string-fg (face-foreground
+                       'font-lock-string-face
+                       nil 'default))
+           (comment-fg (face-foreground
+                        'font-lock-comment-face
+                        nil 'default))
+           (block-bg (merge-hsl
+                      1.0 1.0 0.9 default-bg
+                      0.0 0.0 0.1 default-fg)))
 
-   (defun derive-faces (&rest args)
-     (cl-labels
-         ((hsl (color-name)
-               (apply #'color-rgb-to-hsl
-                      (color-name-to-rgb color-name)))
-          (hue-clamp (value)
-                     (- value (floor value)))
-          (merge-hsl
-           (wh1 ws1 wl1 color1 wh2 ws2 wl2 color2)
-           (cl-multiple-value-bind (h1 s1 l1) (hsl color1)
-             (cl-multiple-value-bind (h2 s2 l2) (hsl color2)
-               (apply
-                #'color-rgb-to-hex
-                (color-hsl-to-rgb
-                 (hue-clamp   (+ (* wh1 h1) (* wh2 h2)))
-                 (color-clamp (+ (* ws1 s1) (* ws2 s2)))
-                 (color-clamp (+ (* wl1 l1) (* wl2 l2))))))))
-          (respec (face &rest arguments)
-                  (when (member face (face-list))
-                    (face-spec-reset-face face)
-                    (apply #'set-face-attribute
-                           face nil
-                           arguments))))
-       (redraw-display) ;; make theme change actually happen
-       (let* ((default-bg (face-background 'default))
-              (default-fg (face-foreground 'default))
-              (string-fg (face-foreground
-                          'font-lock-string-face
-                          nil 'default))
-              (comment-fg (face-foreground
-                           'font-lock-comment-face
-                           nil 'default))
-              (block-bg (merge-hsl
-                         1.0 1.0 0.9 default-bg
-                         0.0 0.0 0.1 default-fg)))
+      ;; Derive suitable colors for org-blocks
+      (respec 'org-block-begin-line
+              :background block-bg
+              :foreground comment-fg)
+      (respec 'org-block-end-line
+              :inherit 'org-block-begin-line)
+      (respec 'org-block
+              :background (merge-hsl
+                           0.0 0.3 0.3 default-bg
+                           1.0 0.7 0.7 block-bg)
+              :inherit 'unspecified)
 
-         ;; Derive suitable colors for org-blocks
-         (respec 'org-block-begin-line
-                 :background block-bg
-                 :foreground comment-fg)
-         (respec 'org-block-end-line
-                 :inherit 'org-block-begin-line)
-         (respec 'org-block
-                 :background (merge-hsl
-                              0.0 0.3 0.3 default-bg
-                              1.0 0.7 0.7 block-bg)
-                 :inherit 'unspecified)
+      ;; Make rainbow-delimiters actually a rainbow
+      (dotimes (i 9)
+        (let ((face
+               (intern
+                (format "rainbow-delimiters-depth-%d-face"
+                        (+ i 1)))))
+          (respec face
+                  :foreground
+                  (merge-hsl
+                   1.0 1.0 1.0 default-fg
+                   (+ 0.5 (* i 0.166)) 0.8 0.0 "#ff00ff"))))
 
-         ;; Make rainbow-delimiters actually a rainbow
-         (dotimes (i 9)
-           (let ((face
-                  (intern
-                   (format "rainbow-delimiters-depth-%d-face"
-                           (+ i 1)))))
-             (respec face
-                     :foreground
-                     (merge-hsl
-                      1.0 1.0 1.0 default-fg
-                      (+ 0.5 (* i 0.166)) 0.8 0.0 "#ff00ff"))))
+      ;; dired+ faces
+      (respec 'diredp-compressed-file-suffix :inherit 'font-lock-comment-face)
+      (respec 'diredp-file-suffix :inherit 'font-lock-comment-face)
+      (respec 'diredp-date-time :inherit 'font-lock-comment-face)
+      (respec 'diredp-dir-heading :inherit 'org-block-begin-line)
+      (respec 'diredp-dir-name :inherit 'dired-directory)
+      (respec 'diredp-symlink :inherit 'font-lock-constant-face)
+      (respec 'diredp-file-name :inherit 'default)
+      (respec 'diredp-ignored-file-name :inherit 'font-lock-comment-face)
+      (respec 'diredp-number :inherit 'font-lock-constant-face)
+      (respec 'diredp-flag-mark :inherit 'highlight)
+      (respec 'diredp-flag-mark-line :inherit 'highlight)
+      (respec 'diredp-deletion :inherit 'warning)
+      (respec 'diredp-deletion-file-name :inherit 'warning)
+      (respec 'diredp-dir-priv :inherit 'dired-directory)
+      (respec 'diredp-read-priv :inherit 'rainbow-delimiters-depth-1-face)
+      (respec 'diredp-write-priv :inherit 'rainbow-delimiters-depth-2-face)
+      (respec 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-3-face)
+      (respec 'diredp-link-priv :inherit 'default)
+      (respec 'diredp-rare-priv :inherit 'default)
 
-         ;; dired+ faces
-         (respec 'diredp-compressed-file-suffix :inherit 'font-lock-comment-face)
-         (respec 'diredp-file-suffix :inherit 'font-lock-comment-face)
-         (respec 'diredp-date-time :inherit 'font-lock-comment-face)
-         (respec 'diredp-dir-heading :inherit 'org-block-begin-line)
-         (respec 'diredp-dir-name :inherit 'dired-directory)
-         (respec 'diredp-symlink :inherit 'font-lock-constant-face)
-         (respec 'diredp-file-name :inherit 'default)
-         (respec 'diredp-ignored-file-name :inherit 'font-lock-comment-face)
-         (respec 'diredp-number :inherit 'font-lock-constant-face)
-         (respec 'diredp-flag-mark :inherit 'highlight)
-         (respec 'diredp-flag-mark-line :inherit 'highlight)
-         (respec 'diredp-deletion :inherit 'warning)
-         (respec 'diredp-deletion-file-name :inherit 'warning)
-         (respec 'diredp-dir-priv :inherit 'dired-directory)
-         (respec 'diredp-read-priv :inherit 'rainbow-delimiters-depth-1-face)
-         (respec 'diredp-write-priv :inherit 'rainbow-delimiters-depth-2-face)
-         (respec 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-3-face)
-         (respec 'diredp-link-priv :inherit 'default)
-         (respec 'diredp-rare-priv :inherit 'default)
+      ;; regexp-grouping constructs should have the same color as the
+      ;; `font-lock-string-face', but different emphasis.
+      (respec 'font-lock-regexp-grouping-backslash
+              :foreground (merge-hsl
+                           0.0 0.5 0.5 default-bg
+                           1.0 0.5 0.5 string-fg))
 
-         ;; regexp-grouping constructs should have the same color as the
-         ;; `font-lock-string-face', but different emphasis.
-         (respec 'font-lock-regexp-grouping-backslash
-                 :foreground (merge-hsl
-                              0.0 0.5 0.5 default-bg
-                              1.0 0.5 0.5 string-fg))
+      (respec 'font-lock-regexp-grouping-construct
+              :foreground (merge-hsl
+                           0.0 0.5 0.75 default-bg
+                           1.0 0.5 0.75 string-fg)
+              :weight 'bold)
 
-         (respec 'font-lock-regexp-grouping-construct
-                 :foreground (merge-hsl
-                              0.0 0.5 0.75 default-bg
-                              1.0 0.5 0.75 string-fg)
-                 :weight 'bold)
+      (advice-add 'load-theme :after #'derive-faces))))
 
-         (advice-add 'load-theme :after #'derive-faces))))
-
-   (add-hook 'emacs-startup-hook
-             (lambda ()
-               ;; wait for face initialization
-               (run-at-time 0.1 nil #'derive-faces)))))
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            ;; wait for face initialization
+            (run-at-time 0.1 nil #'derive-faces)))
 #+END_SRC
 
 * Minor Modes
@@ -475,6 +469,7 @@ all file types gracefully. The openwith mode compensates for this by
 opening files with certain extensions in external programs. It is important
 to adapt the variable `openwith-associations' to suit ones personal
 preferences.
+
 #+BEGIN_SRC emacs-lisp
 (setup openwith
   (:ensure t)
@@ -499,6 +494,7 @@ A mode for interactively building regular expressions and viewing their
 effect on the selected buffer. Mostly made obsolete by the Evil mode search
 and replace facility, but sometimes useful for complex regular expressions
 with multiple grouping constructs.
+
 #+BEGIN_SRC emacs-lisp
 (setup re-builder
   (:config
@@ -506,6 +502,7 @@ with multiple grouping constructs.
 #+END_SRC
 
 ** Bibliographic References with Reftex
+
 #+BEGIN_SRC emacs-lisp
 (setup reftex
   (:ensure t)
@@ -532,6 +529,7 @@ with multiple grouping constructs.
 ** Image viewing with Emacs
 Emacs can open images but does not rescale them to fit to the buffer. The
 `image+' library scales pictures accordingly.
+
 #+BEGIN_SRC emacs-lisp
 (setup image+
   (:ensure t)
@@ -541,6 +539,9 @@ Emacs can open images but does not rescale them to fit to the buffer. The
 #+END_SRC
 
 ** Gracefully manage matching Parentheses with Paredit
+Paredit is what separates happy Lisp programmers from those crying about
+superfluous parentheses.
+
 #+BEGIN_SRC emacs-lisp
 (setup paredit
   (:ensure t))
@@ -592,115 +593,108 @@ Finally there is this little hack for full fontification of long Org mode
 buffers. It is not clear (as of 2016) whether this is still an issue.
 
 #+BEGIN_SRC emacs-lisp
-(setup org-fontification-hack
-  (:config
-   (setf jit-lock-chunk-size 10000)))
+(setf jit-lock-chunk-size 10000)
 #+END_SRC
 
 *** Organizing with Org Agenda
-#+BEGIN_SRC emacs-lisp
-(setup org-agenda
-  (:config
-   (make-directory "~/.emacs.d/eap-playlists" t)
 
-   (setf org-agenda-compact-blocks nil)
-   (setf org-agenda-files "~/.emacs.d/org/agenda-files.org")
-   (setf org-agenda-include-diary t)
-   (setf org-agenda-span 'week)
-   (setf org-agenda-sticky nil)
-   (setq
-    org-capture-templates
-    '(("t" "Task - needs to be done" entry
-       (file+headline "~/.emacs.d/org/cal.org" "incoming")
-       "* TODO %?
+#+BEGIN_SRC emacs-lisp
+(make-directory "~/.emacs.d/eap-playlists" t)
+
+(setf org-agenda-compact-blocks nil)
+(setf org-agenda-files "~/.emacs.d/org/agenda-files.org")
+(setf org-agenda-include-diary t)
+(setf org-agenda-span 'week)
+(setf org-agenda-sticky nil)
+(setq
+ org-capture-templates
+ '(("t" "Task - needs to be done" entry
+    (file+headline "~/.emacs.d/org/cal.org" "incoming")
+    "* TODO %?
                Entered on %U")
-      ("d" "Deadline - task with deadline" entry
-       (file+headline "~/.emacs.d/org/cal.org" "incoming")
-       "* TODO %?
+   ("d" "Deadline - task with deadline" entry
+    (file+headline "~/.emacs.d/org/cal.org" "incoming")
+    "* TODO %?
                DEADLINE: %^t
                Entered on %U")
-      ("e" "Event - something that happens at a specified date" entry
-       (file+headline "~/.emacs.d/org/cal.org" "incoming")
-       "* APPT %?
+   ("e" "Event - something that happens at a specified date" entry
+    (file+headline "~/.emacs.d/org/cal.org" "incoming")
+    "* APPT %?
                When: %^t
                Entered on %U")
-      ("n" "Note - capture some info" entry
-       (file+headline "~/.emacs.d/org/notes.org" "incoming")
-       "* %?
+   ("n" "Note - capture some info" entry
+    (file+headline "~/.emacs.d/org/notes.org" "incoming")
+    "* %?
                Entered on %U")
-      ("z" "Zitat - Capture noteworthy statements" entry
-       (file+headline "~/.emacs.d/org/quotes.org" "Zitate")
-       "* %^{Who said it} %U
-               \"%?\"")))))
+   ("z" "Zitat - Capture noteworthy statements" entry
+    (file+headline "~/.emacs.d/org/quotes.org" "Zitate")
+    "* %^{Who said it} %U
+               \"%?\"")))
 #+END_SRC
 
 *** Generating LaTeX from Org mode buffers
+
 #+BEGIN_SRC emacs-lisp
 (setup cdlatex
   (:ensure t))
 
-(setup org-plus-contrib
-  (:ensure t)
-  (:config
-   (setf org-latex-create-formula-image-program 'imagemagick)
-   (setf org-format-latex-options
-         (plist-put org-format-latex-options :scale 1.6))
-   (add-hook 'org-mode-hook 'turn-on-org-cdlatex)
-   (setf org-latex-listings 'minted)
-   (add-to-list 'org-latex-packages-alist '("" "minted"))
-   (setf org-latex-minted-options
-         '(("frame" "single") ("framesep" "6pt")
-           ("mathescape" "true") ("fontsize" "\\footnotesize")))
-   (setq
-    org-latex-pdf-process
-    '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-      "bibtex $(basename %b)"
-      "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-      "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
-   (setq
-    LaTeX-command-style
-    '((""
-       "%(PDF)%(latex) -shell-escape %(file-line-error) %(extraopts) %S%(PDFout)")))))
+(setf org-latex-create-formula-image-program 'imagemagick)
+(setf org-format-latex-options
+      (plist-put org-format-latex-options :scale 1.6))
+(add-hook 'org-mode-hook 'turn-on-org-cdlatex)
+(setf org-latex-listings 'minted)
+(add-to-list 'org-latex-packages-alist '("" "minted"))
+(setf org-latex-minted-options
+      '(("frame" "single") ("framesep" "6pt")
+        ("mathescape" "true") ("fontsize" "\\footnotesize")))
+(setq
+ org-latex-pdf-process
+ '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+   "bibtex $(basename %b)"
+   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
+(setq
+ LaTeX-command-style
+ '((""
+    "%(PDF)%(latex) -shell-escape %(file-line-error) %(extraopts) %S%(PDFout)")))
 #+END_SRC
 
 *** Managing source code with Org Babel
+
 #+BEGIN_SRC emacs-lisp
-(setup org-plus-contrib
-  (:ensure t)
-  (:config
-   (setf org-edit-src-content-indentation 0)
-   (org-babel-do-load-languages
-    'org-babel-load-languages
-    '((asymptote . t)
-      (awk . t)
-      (calc . t)
-      (C . t)
-      (clojure . t)
-      (css . t)
-      (ditaa . t)
-      (dot . t)
-      (emacs-lisp . t)
-      (gnuplot . t)
-      (haskell . t)
-      (java . t)
-      (js . t)
-      (latex . t)
-      (lisp . t)
-      (lilypond . t)
-      (maxima . t)
-      (ocaml . t)
-      (octave . t)
-      (org . t)
-      (perl . t)
-      (python . t)
-      (ruby . t)
-      (scheme . t)
-      (screen . t)
-      (sh . t)))
-   (setf org-src-preserve-indentation nil)
-   (setf org-src-tab-acts-natively t)
-   (setf org-src-window-setup 'other-window)
-   (setq-default org-export-babel-evaluate 'inline-only)))
+(setf org-edit-src-content-indentation 0)
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((asymptote . t)
+   (awk . t)
+   (calc . t)
+   (C . t)
+   (clojure . t)
+   (css . t)
+   (ditaa . t)
+   (dot . t)
+   (emacs-lisp . t)
+   (gnuplot . t)
+   (haskell . t)
+   (java . t)
+   (js . t)
+   (latex . t)
+   (lisp . t)
+   (lilypond . t)
+   (maxima . t)
+   (ocaml . t)
+   (octave . t)
+   (org . t)
+   (perl . t)
+   (python . t)
+   (ruby . t)
+   (scheme . t)
+   (screen . t)
+   (sh . t)))
+(setf org-src-preserve-indentation nil)
+(setf org-src-tab-acts-natively t)
+(setf org-src-window-setup 'other-window)
+(setq-default org-export-babel-evaluate 'inline-only)
 #+END_SRC
 
 The org-src minor mode allows to edit a single source code block in a
@@ -726,7 +720,6 @@ buffers.
 #+BEGIN_SRC emacs-lisp
 (setup org-crypt
   (:config
-   (require 'org-crypt)
    (setf auto-save-default nil)
    (org-crypt-use-before-save-magic)
    (setf org-tags-exclude-from-inheritance '("crypt"))
@@ -734,6 +727,7 @@ buffers.
 #+END_SRC
 
 *** Beautiful Presentations with Org Reveal
+
 #+BEGIN_SRC emacs-lisp
 (setup ox-reveal
   (:ensure t)
@@ -748,6 +742,7 @@ Org drill is an amazing tool to learn new facts. In a first step, one creates
 drill cards, which are nothing more than org subtrees with some metadata and the
 `:drill:' tag. Afterwards the command `org-drill' will start a sophisticated
 drill session.
+
 #+BEGIN_SRC emacs-lisp
 (setup org-drill
   (:config
@@ -917,9 +912,7 @@ opposite direction), so as an alternative the font lock decoration level is
 lowered.
 
 #+BEGIN_SRC emacs-lisp
-(setup c++-font-lock
-  (:config
-   (setf font-lock-maximum-decoration (quote ((c++-mode . 2) (t . t))))))
+(setf font-lock-maximum-decoration (quote ((c++-mode . 2) (t . t))))
 #+END_SRC
 
 ** Common Lisp
@@ -933,14 +926,15 @@ lowered.
    (setf inferior-lisp-program "sbcl")
    (slime-setup
     '(slime-fancy
+      slime-sbcl-exts
       slime-cl-indent
       slime-sprof
       slime-asdf
       slime-fancy-inspector
       slime-company
       ;;slime-fuzzy
-      slime-autodoc
-      ))
+      slime-autodoc))
+
    (setq
     common-lisp-hyperspec-root
     "file:/home/marco/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
@@ -971,61 +965,59 @@ The language Emacs Lisp is a fine blend of Maclisp, Common Lisp and some
 language for editing text. Unsurprisingly Emacs is well suited for editing
 Emacs Lisp. The only worthwile addition provided here is a simple Macro
 stepper called `macroexpand-point'.
+
 #+BEGIN_SRC emacs-lisp
-(setup emacs-lisp
-  (:config
+(define-derived-mode emacs-lisp-macroexpand-mode emacs-lisp-mode
+  "Macro Expansion"
+  "Major mode for displaying Emacs Lisp macro expansions."
+  (setf buffer-read-only t))
 
-   (define-derived-mode emacs-lisp-macroexpand-mode emacs-lisp-mode
-     "Macro Expansion"
-     "Major mode for displaying Emacs Lisp macro expansions."
-     (setf buffer-read-only t))
+(define-key emacs-lisp-mode-map
+  (kbd "C-c m") 'macroexpand-point)
 
-   (define-key emacs-lisp-mode-map
-     (kbd "C-c m") 'macroexpand-point)
+(define-key org-mode-map
+  (kbd "C-c m") 'macroexpand-point)
 
-   (define-key org-mode-map
-     (kbd "C-c m") 'macroexpand-point)
-
-   (defun macroexpand-point (arg)
-     "Apply `macroexpand' to the S-expression at point and show
+(defun macroexpand-point (arg)
+  "Apply `macroexpand' to the S-expression at point and show
 the result in a temporary buffer. If already in such a buffer,
 expand the expression in place.
 
 With a prefix argument, perform `macroexpand-all' instead."
-     (interactive "P")
-     (let ((bufname "*emacs-lisp-macroexpansion*")
-           (bounds (bounds-of-thing-at-point 'sexp))
-           (expand (if arg #'macroexpand-all #'macroexpand)))
-       (unless bounds
-         (error "No S-expression at point."))
-       (let* ((beg (car bounds))
-              (end (cdr bounds))
-              (expansion
-               (funcall expand
-                        (first
-                         (read-from-string
-                          (buffer-substring beg end))))))
-         (if (eq major-mode 'emacs-lisp-macroexpand-mode)
-             (let ((inhibit-read-only t)
-                   (full-sexp
-                    (car (read-from-string
-                          (concat
-                           (buffer-substring (point-min) beg)
-                           (prin1-to-string expansion)
-                           (buffer-substring end (point-max)))))))
-               (delete-region (point-min) (point-max))
-               (save-excursion
-                 (pp full-sexp (current-buffer)))
-               (goto-char beg))
-           (let ((temp-buffer-show-hook '(emacs-lisp-macroexpand-mode)))
-             (with-output-to-temp-buffer bufname
-               (pp expansion)))))))
+  (interactive "P")
+  (let ((bufname "*emacs-lisp-macroexpansion*")
+        (bounds (bounds-of-thing-at-point 'sexp))
+        (expand (if arg #'macroexpand-all #'macroexpand)))
+    (unless bounds
+      (error "No S-expression at point."))
+    (let* ((beg (car bounds))
+           (end (cdr bounds))
+           (expansion
+            (funcall expand
+                     (first
+                      (read-from-string
+                       (buffer-substring beg end))))))
+      (if (eq major-mode 'emacs-lisp-macroexpand-mode)
+          (let ((inhibit-read-only t)
+                (full-sexp
+                 (car (read-from-string
+                       (concat
+                        (buffer-substring (point-min) beg)
+                        (prin1-to-string expansion)
+                        (buffer-substring end (point-max)))))))
+            (delete-region (point-min) (point-max))
+            (save-excursion
+              (pp full-sexp (current-buffer)))
+            (goto-char beg))
+        (let ((temp-buffer-show-hook '(emacs-lisp-macroexpand-mode)))
+          (with-output-to-temp-buffer bufname
+            (pp expansion)))))))
 
-   (add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
-   (add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
-   (add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
-   (add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
-   (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)))
+(add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
+(add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
+(add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
+(add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
+(add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
 #+END_SRC
 
 ** Maxima
@@ -1117,45 +1109,41 @@ individual explanation beyond the hint that `C-h v' and `C-h f' explain an
 Emacs variable and function, respectively.
 
 #+BEGIN_SRC emacs-lisp
-(setup simple-modifications
-  (:config
-   (setf user-full-name "Marco Heisig")
-   (setf user-mail-address "marco.heisig@fau.de")
-   (setf frame-title-format "%b - Emacs")
-   (setf large-file-warning-threshold (* 1000 1000 400))
-   (setf read-file-name-completion-ignore-case t)
-   (setf read-buffer-completion-ignore-case t)
-   (setf visible-bell nil)
-   (setf ring-bell-function (lambda ())) ; AKA do nothing
-   (prefer-coding-system 'utf-8)
-   (setf save-abbrevs nil)
-   (setf browse-url-browser-function 'browse-url-chromium)
-   (column-number-mode 1)
-   (setf echo-keystrokes 0.01)
-   (setq-default fill-column 75)
-   (setq-default truncate-lines t)
-   (setq-default initial-major-mode 'org-mode)
-   (setq-default major-mode 'org-mode)
-   (setf require-final-newline t)
-   (setq-default indent-tabs-mode nil)
-   (setq-default tab-width 8)
-   (setf indicate-buffer-boundaries nil)
-   (setf fringe-mode 4)
-   (setq-default indicate-empty-lines t)
-   (setf initial-scratch-message nil)
-   (setf pop-up-frames nil)))
+(setf user-full-name "Marco Heisig")
+(setf user-mail-address "marco.heisig@fau.de")
+(setf frame-title-format "%b - Emacs")
+(setf large-file-warning-threshold (* 1000 1000 400))
+(setf read-file-name-completion-ignore-case t)
+(setf read-buffer-completion-ignore-case t)
+(setf visible-bell nil)
+(setf ring-bell-function (lambda ())) ; AKA do nothing
+(prefer-coding-system 'utf-8)
+(setf save-abbrevs nil)
+(setf browse-url-browser-function 'browse-url-chromium)
+(column-number-mode 1)
+(setf echo-keystrokes 0.01)
+(setq-default fill-column 75)
+(setq-default truncate-lines t)
+(setq-default initial-major-mode 'org-mode)
+(setq-default major-mode 'org-mode)
+(setf require-final-newline t)
+(setq-default indent-tabs-mode nil)
+(setq-default tab-width 8)
+(setf indicate-buffer-boundaries nil)
+(setf fringe-mode 4)
+(setq-default indicate-empty-lines t)
+(setf initial-scratch-message nil)
+(setf pop-up-frames nil)
 #+END_SRC
 
 Emacs wizards have memoized all their commands and have no need for visual
 guidance.
 
 #+BEGIN_SRC emacs-lisp
-(setup window-layout
-  (:config
-   (tooltip-mode -1)
-   (tool-bar-mode -1)
-   (menu-bar-mode -1)
-   (scroll-bar-mode -1)))
+(tooltip-mode -1)
+(tool-bar-mode -1)
+(menu-bar-mode -1)
+(scroll-bar-mode -1)
 #+END_SRC
 
 Emacs disables several interactive functions by default, because they would
@@ -1164,17 +1152,15 @@ user of this configuration should familiarize himself with those commands or
 leave them disabled.
 
 #+BEGIN_SRC emacs-lisp
-(setup advanced-commands
-  (:config
-   (put 'narrow-to-page 'disabled nil)
-   (put 'narrow-to-region 'disabled nil)
-   (put 'upcase-region 'disabled nil)
-   (put 'downcase-region 'disabled nil)
-   ;; (put 'set-goal-column 'disabled nil)
-   (put 'dired-find-alternate-file 'disabled nil)
-   (put 'erase-buffer 'disabled nil)
-   (put 'scroll-left 'disabled nil)
-   (put 'scroll-right 'disabled nil)))
+(put 'narrow-to-page 'disabled nil)
+(put 'narrow-to-region 'disabled nil)
+(put 'upcase-region 'disabled nil)
+(put 'downcase-region 'disabled nil)
+;; (put 'set-goal-column 'disabled nil)
+(put 'dired-find-alternate-file 'disabled nil)
+(put 'erase-buffer 'disabled nil)
+(put 'scroll-left 'disabled nil)
+(put 'scroll-right 'disabled nil)
 #+END_SRC
 
 There are two major annoyances in an uncofigured Emacs. First, killing a
@@ -1183,34 +1169,28 @@ time. Second, a prompt for interactive confirmation requires the user to type
 `y e s RET' instead of a simple `y'. The next code fixes both these issues.
 
 #+BEGIN_SRC emacs-lisp
-(setup annoyances
-  (:config
-   (setf kill-buffer-query-functions
-         (remq 'process-kill-buffer-query-function
-               kill-buffer-query-functions))
+(setf kill-buffer-query-functions
+      (remq 'process-kill-buffer-query-function
+            kill-buffer-query-functions))
 
-   (defalias 'yes-or-no-p 'y-or-n-p)))
+(defalias 'yes-or-no-p 'y-or-n-p)
 #+END_SRC
 
 Now some customization of the hilighting of matching parentheses.
 
 #+BEGIN_SRC emacs-lisp
-(setup paren
-  (:config
-   (setf show-paren-delay 0
-         blink-matching-paren nil
-         show-paren-style 'parenthesis)
-   (show-paren-mode)))
+(setf show-paren-delay 0
+      blink-matching-paren nil
+      show-paren-style 'parenthesis)
+(show-paren-mode)
 #+END_SRC
 
 Visually indicate the two major sins in programming: tabs and trailing
 whitespace.
 
 #+BEGIN_SRC emacs-lisp
-(setup whitespace
-  (:config
-   (setf whitespace-style '(face trailing tab-mark))
-   (global-whitespace-mode)))
+(setf whitespace-style '(face trailing tab-mark))
+(global-whitespace-mode)
 #+END_SRC
 
 Another thing that has probably scared away thousands of potential Emacs
@@ -1224,19 +1204,15 @@ hardware backup solution. The second, more profane one is that the
 org-crypt mode does not work well with auto-save.
 
 #+BEGIN_SRC emacs-lisp
-(setup auto-save
-  (:config
-   (setf auto-save-default nil
-         auto-save-list-file-prefix "~/.emacs.d/auto-save/save-"
-         backup-directory-alist (quote (("." . "~/.emacs.d/saves")))
-         backup-inhibited nil)))
+(setf auto-save-default nil
+      auto-save-list-file-prefix "~/.emacs.d/auto-save/save-"
+      backup-directory-alist (quote (("." . "~/.emacs.d/saves")))
+      backup-inhibited nil)
 #+END_SRC
 
 ** The Color Theme and Modeline
 This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
-
-The preferred color themes of Marco Heisig.
 
 #+BEGIN_SRC emacs-lisp
 (setup zenburn-theme
@@ -1256,10 +1232,7 @@ The preferred color themes of Marco Heisig.
    (defun load-spacemacs-theme (&optional frame)
      (advice-add 'true-color-p :around #'always-true)
      (load-theme 'spacemacs-dark t)
-     (advice-remove 'true-color-p #'always-true))
-
-   ;(load-spacemacs-theme)
-   ))
+     (advice-remove 'true-color-p #'always-true))))
 #+END_SRC
 
 The package `powerline' and its derivative `spaceline' make the Emacs mode
@@ -1282,25 +1255,23 @@ solution that first uses native fontification, but the applies a different
 background to illustrate the block structure.
 
 #+BEGIN_SRC emacs-lisp
-(setup org-src-fontification
-  (:config
-   (setf org-src-fontify-natively t)
+(setf org-src-fontify-natively t)
 
-   (defun org-src-fontification--after (lang start end)
-     (let ((pos start) next)
-       (while (and (setq next (next-single-property-change pos 'face))
-                   (<= next end))
-         ;; org-src occasionally places invalid faces of nil in the text
-         ;; properties, so I have to remove them before calling
-         ;; `add-face-text-property'.
-         (unless (get-text-property pos 'face)
-           (remove-text-properties pos next '(face nil)))
-         (add-face-text-property
-          pos next 'org-block)
-         (setq pos next))))
+(defun org-src-fontification--after (lang start end)
+  (let ((pos start) next)
+    (while (and (setq next (next-single-property-change pos 'face))
+                (<= next end))
+      ;; org-src occasionally places invalid faces of nil in the text
+      ;; properties, so I have to remove them before calling
+      ;; `add-face-text-property'.
+      (unless (get-text-property pos 'face)
+        (remove-text-properties pos next '(face nil)))
+      (add-face-text-property
+       pos next 'org-block)
+      (setq pos next))))
 
-   (advice-add 'org-src-font-lock-fontify-block
-               :after #'org-src-fontification--after)))
+(advice-add 'org-src-font-lock-fontify-block
+            :after #'org-src-fontification--after)
 #+END_SRC
 
 ** Keybindings
@@ -1443,15 +1414,13 @@ A collection of buffers that should be opened as soon as Emacs is
 started. The list contains mostly directories.
 
 #+BEGIN_SRC emacs-lisp
-(setup initial-buffers
-  (:config
-   (save-excursion
-     (find-file-existing "~/.emacs.d/")
-     (find-file "~/userdata/gaming/*" t)
-     (find-file "~/userdata/*" t)
-     (find-file "~/userdata/proj/*" t)
-     (find-file "~/userdata/events/*" t))
-   (setf initial-buffer-choice "~/userdata")))
+(save-excursion
+  (find-file-existing "~/.emacs.d/")
+  (find-file "~/userdata/gaming/*" t)
+  (find-file "~/userdata/*" t)
+  (find-file "~/userdata/proj/*" t)
+  (find-file "~/userdata/events/*" t))
+(setf initial-buffer-choice "~/userdata")
 #+END_SRC
 
 ** Cleanup the Mode Line with Diminish
@@ -1485,6 +1454,7 @@ init file was loaded successfully and if not, what went wrong.
             :override #'ignore)
 
 (defun summarize-initialization ()
+  (kill-buffer "*Messages*") ;; previous messages are spam
   (let ((errors (length init.el-errors)))
     (if (= 0 errors)
         (message "Initialization successful - happy hacking.")
@@ -1498,7 +1468,6 @@ init file was loaded successfully and if not, what went wrong.
         init.el-errors
         "\n")))))
 
-;; display the summary after the spam from the emacs server
 (add-hook 'emacs-startup-hook
           (lambda ()
             (run-at-time
@@ -1510,8 +1479,6 @@ init file was loaded successfully and if not, what went wrong.
 
 * Possible Improvements
 A list of things that could be improved in this Emacs config
-*** TODO The powerline is not activated in the *Messages* buffer
-Probably because the *Messages* buffer is created before powerline.
 *** TODO The `M-.' is shadowed by `evil-repeat-pop-next', but should jump to a Lisp definition.
 Probably also some other Evil features could be added in SLIME
 *** TODO configure and use doc-view mode
@@ -1528,3 +1495,4 @@ Probably it would be useful to re-enable auto-save in some way
 *** TODO borrow spacemacs config
 Especially the major mode setup and helm
 *** TODO whitespace mode not enabled everywhere
+*** TODO add dedicated command `jk-magic'

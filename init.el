@@ -4,12 +4,23 @@
 #+PROPERTY: header-args:emacs-lisp :results value silent
 #+OPTIONS: H:2
 
-#+BEGIN_SRC emacs-lisp :eval no :exports none :wrap ?"
-(defvar init-errors '()
+This is Marco Heisig's [[http://www.gnu.org/software/emacs/emacs.html][Emacs]] configuration. It is written in a Literal
+Programming style and the [[http://www.orgmode.org][Org mode]] is used to manage the individual code
+snippets.
+
+* Introduction
+** Making this file loadable
+The first few lines of this file contain magic incantations that make it
+also a valid Emacs `init.el' file. They are only interesting for seasoned
+Emacs Lisp hackers, and are therefore not exported when formatting this
+document with the Org mode.
+
+#+BEGIN_SRC emacs-lisp :eval no :export no :wrap ?"
+(defvar init.el-errors '()
   "A list of errors that occured during initialization. Each
 error is of the form (LINE ERROR &rest ARGS).")
 
-(defvar init-file-line 0
+(defvar init.el-line 0
   "Approximation to the currently executed line in this file.")
 
 (defmacro with-buckled-seatbelts (&rest body)
@@ -17,8 +28,8 @@ error is of the form (LINE ERROR &rest ARGS).")
     `(condition-case-unless-debug ,err
          ,(macroexp-progn body)
        (error
-        (push (cons init-file-line ,err)
-              init-errors)))))
+        (push (cons init.el-line ,err)
+              init.el-errors)))))
 
 (package-initialize)
 (find-file-existing load-file-name)
@@ -26,31 +37,10 @@ error is of the form (LINE ERROR &rest ARGS).")
       (inhibit-redisplay t)) ; less flickering
   (org-babel-map-executables nil
     (unless (looking-at org-babel-lob-one-liner-regexp)
-      (setf init-file-line (line-number-at-pos))
+      (setf init.el-line (line-number-at-pos))
       (with-buckled-seatbelts
        (org-babel-execute-src-block)))))
 (kill-buffer)
-
-(defun summarize-initialization ()
-  (let ((errors (length init-errors)))
-    (if (= 0 errors)
-        (message "Initialization successful - happy hacking.")
-      (message
-       "There have been %d errors during init:\n%s"
-       (length init-errors)
-       (mapconcat
-        (lambda (init-error)
-          (pcase-let ((`(,line ,err ,rest) init-error))
-            (format "Lines %d+: %s %s" line err rest)))
-        init-errors
-        "\n")))))
-
-;; display the summary after the spam from the emacs server
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (run-at-time
-             0.1 nil
-             #'summarize-initialization)))
 
 ;; make `load' skip the rest of this file
 (setf load-read-function
@@ -60,14 +50,9 @@ error is of the form (LINE ERROR &rest ARGS).")
         '(setf load-read-function nil)))
 #+END_SRC
 
-* Introduction
-This is Marco Heisig's [[http://www.gnu.org/software/emacs/emacs.html][Emacs]] configuration. It is written in a Literal
-Programming style and the [[http://www.orgmode.org][Org mode]] is used to manage the individual code
-snippets. The first few lines of this file contain magic incantations that
-make it also a valid Emacs `init.el' file.
-
-This initialization is divided into several chapters. The first chapter,
-with the title [[*Meta Configuration][Meta Configuration]], describes how the configuration itself
+** Introduction
+The rest of this configuration file is divided into several chapters. The
+first chapter, [[*Meta Configuration][Meta Configuration]], describes how the configuration itself
 is loaded and how missing functionality is obtained via the Emacs package
 manager. The chapter [[*Minor Modes][Minor Modes]] enables and configures a plethora of
 secondary features for an amazing Emacs experience. The third chapter [[*Major Modes][Major
@@ -124,8 +109,8 @@ handle all errors that arise.
 
 #+BEGIN_SRC emacs-lisp
 (defun setup-ensure (package arg)
-  (unless (or (ignore-errors (require package))
-              (not arg))
+  (when (and (not (ignore-errors (require package)))
+             arg)
     (cl-typecase arg
      (string
       (save-excursion
@@ -517,7 +502,7 @@ preferences.
             "libreoffice" (file))
            ("\\.xcf\\'"
             "gimp" (file))
-           ("\\.\\(?:mp3\\|wav\\|mp4\\|mpe?g\\|avi\\|flac\\|ogg\\|wma\\|m4a\\)\\'"
+           ("\\.\\(?:mp3\\|wav\\|mp4\\|mpe?g\\|avi\\|flac\\|ogg\\|wma\\|m4a\\|mkv\\)\\'"
             "vlc" (file))))))
 #+END_SRC
 
@@ -571,6 +556,12 @@ Emacs can open images but does not rescale them to fit to the buffer. The
 #+BEGIN_SRC emacs-lisp
 (setup paredit
   (:ensure t))
+
+(setup evil-paredit
+  (:ensure t)
+  (:config
+   (defun enable-evil-paredit-mode ()
+     (evil-paredit-mode 1))))
 #+END_SRC
 
 * Major Modes
@@ -973,6 +964,7 @@ lowered.
 
    (add-hook 'slime-mode-hook 'rainbow-delimiters-mode)
    (add-hook 'slime-mode-hook 'enable-paredit-mode)
+   (add-hook 'slime-mode-hook 'enable-evil-paredit-mode)
    (add-hook 'slime-repl-mode-hook 'enable-paredit-mode)
 
    ;; workaround for paredit on the slime REPL
@@ -1042,6 +1034,7 @@ With a prefix argument, perform `macroexpand-all' instead."
                (pp expansion)))))))
 
    (add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
+   (add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
    (add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
    (add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
    (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)))
@@ -1078,6 +1071,7 @@ With a prefix argument, perform `macroexpand-all' instead."
   (:config
    (setf scheme-program-name "guile")
    (add-hook 'scheme-mode-hook 'enable-paredit-mode)
+   (add-hook 'scheme-mode-hook 'enable-evil-paredit-mode)
    (add-hook 'scheme-mode-hook 'enable-company-mode)
    (add-hook 'scheme-mode-hook 'rainbow-delimiters-mode)))
 #+END_SRC
@@ -1260,7 +1254,7 @@ The preferred color themes of Marco Heisig.
 (setup zenburn-theme
   (:ensure t)
   (:config
-   (load-theme 'zenburn)
+   (load-theme 'zenburn t)
    (set-face-attribute 'button nil :inherit 'link)))
 
 (setup spacemacs-theme
@@ -1480,6 +1474,7 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
   (:ensure t)
   (:config
    (diminish 'paredit-mode)
+   (diminish 'evil-paredit-mode)
    (diminish 'global-whitespace-mode)
    (diminish 'company-mode)
    (diminish 'rainbow-mode)
@@ -1492,15 +1487,37 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
    (diminish 'eldoc-mode)))
 #+END_SRC
 
-** Silence Emacs startup
-Emacs is by default very verbose and creates a startup screen and a echo
-message. This snippet disables both. Disabling the echo area message was
-more complicated than expected.
+** Finalization
+After all initialization is complete, display a nice summary whether the
+init file was loaded successfully and if not, what went wrong.
 
 #+BEGIN_SRC emacs-lisp
 (setf inhibit-startup-screen t)
 (advice-add 'display-startup-echo-area-message
             :override #'ignore)
+
+(defun summarize-initialization ()
+  (let ((errors (length init.el-errors)))
+    (if (= 0 errors)
+        (message "Initialization successful - happy hacking.")
+      (message
+       "There have been %d errors during init:\n%s"
+       (length init.el-errors)
+       (mapconcat
+        (lambda (init.el-error)
+          (pcase-let ((`(,line ,err ,rest) init.el-error))
+            (format "Lines %d+: %s %s" line err rest)))
+        init.el-errors
+        "\n")))))
+
+;; display the summary after the spam from the emacs server
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (run-at-time
+             0.1 nil
+             #'summarize-initialization)))
+
+'done
 #+END_SRC
 
 * Possible Improvements

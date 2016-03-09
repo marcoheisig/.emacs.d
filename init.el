@@ -54,7 +54,7 @@ others may skip this section. For those curious how it is possible to
 #+BEGIN_SRC emacs-lisp :eval no :export no :wrap ?"
 (defvar init.el-errors '()
   "A list of errors that occured during initialization. Each
-error is of the form (LINE ERROR &rest ARGS).")
+error is of the form (LINE ERRORMESSAGE).")
 
 (defvar init.el-line 0
   "Approximation to the currently executed line in this file.")
@@ -64,8 +64,10 @@ error is of the form (LINE ERROR &rest ARGS).")
     `(condition-case-unless-debug ,err
          ,(macroexp-progn body)
        (error
-        (push (cons init.el-line ,err)
-              init.el-errors)))))
+        (push
+         (cons init.el-line
+               (error-message-string,err))
+         init.el-errors)))))
 
 (package-initialize) ;; in particular, load org
 (require 'cl-lib) ;; enable Common Lisp features
@@ -91,57 +93,121 @@ error is of the form (LINE ERROR &rest ARGS).")
 #+END_SRC
 
 ** The `setup' macro
-The macro described here is similar to the `use-package' macro provided by
-John Wiegley, but deliberatily simpler to fit into this configuration
-file. It can ensure the presence of a package, apply configuration and
-handle all errors that arise.
+The macro described here is inspired by the `use-package' macro provided by
+John Wiegley, but deliberatily simpler to fit into this file. It can ensure
+the presence of packages and features and apply configuration at various
+times.
 
 #+BEGIN_SRC emacs-lisp
-(defun setup-ensure (package arg)
-  (when (and (not (ignore-errors (require package)))
-             arg)
-    (cl-typecase arg
-     (string
-      (save-excursion
-        (find-file-existing "~/.emacs.d/elisp/")
-        (shell-command arg)
-        (normal-top-level-add-subdirs-to-load-path)
-        (require package)))
-     (t
-      (package-install package)))))
 
-(defun setup-mode-alist (mode regexps)
-  (dolist (regexp regexps)
-    (add-to-list 'auto-mode-alist
-                 `(,regexp . ,mode))))
+(defcustom setup-demote-errors t
+  "Whether `setup' shall catch errors that arise or simply fail
+with an error message."
+  :type 'boolean)
 
-(defmacro setup (name &rest args)
-  "Configure and load a single Emacs package or item. Usage:
+(defvar init.el-missing-packages '())
 
-  (setup package-name
-     (:keyword expr ...) ...)
+(defvar setup-epilogue-hook '()
+  "Hook run after processing all Emacs initialization.")
 
-:init    EXPR ...   -- Code to run before PACKAGE-NAME has been loaded
-:config  EXPR ...   -- Code to run after PACKAGE-NAME has been loaded
-:mode    REGEXP ... -- Add (REGEXP . PACKAGE-NAME) to `auto-mode-alist'
-:ensure  BOOLEAN    -- Loads the package using `package-install' if necessary
-:ensure  STRING     -- Execute STRING with `shell-command' in ~/.emacs.d/elisp/
-"
-  (with-buckled-seatbelts
-    (cl-assert (cl-every (lambda (x) (keywordp (car x))) args) t)
-    (cl-assert (symbolp name))
-    (let ((init-forms   (cdr (assoc :init args)))
-          (config-forms (cdr (assoc :config args)))
-          (ensure-p     (cadr (assoc :ensure args)))
-          (mode-regexps (cdr (assoc :mode args))))
-      `(with-buckled-seatbelts
-         ,@init-forms
-         (setup-ensure ',name ',ensure-p)
-         (setup-mode-alist ',name ',mode-regexps)
-         ,@config-forms
-         nil))))
+(define-error 'setup-error "Error during setup")
+(define-error 'package-error "Missing package(s)" 'setup-error)
+(define-error 'feature-error "Missing feature(s)" 'setup-error)
 
-(put 'setup 'lisp-indent-function 'defun)
+(defun setup-error-handler (condition &rest args)
+  (if setup-demote-errors
+      (message "%s" (error-message-string `(condition . args)))
+    (signal condition args)))
+
+(defun setup-demand-packages (required-packages)
+  (let ((missing-packages
+         (cl-remove-if #'package-installed-p
+                       required-packages)))
+    (when missing-packages
+      (setf init.el-missing-packages
+            (cl-remove-duplicates
+             (append missing-packages
+                     init.el-missing-packages)))
+      (signal 'package-error missing-packages))
+    (mapc ; most packages need to be also required...
+       (lambda (x)
+         (ignore-errors ; ... some dont, ignore their absence
+           (require x)))
+       required-packages)))
+
+(defun setup-demand-features (required-features)
+  (let ((missing-features
+         (cl-remove-if
+          (lambda (x) (require x nil t))
+          required-features)))
+    (when missing-features
+      (signal 'feature-error missing-features))))
+
+(defmacro setup (&rest args)
+  (declare (indent 0))
+  (let ((state :config)
+        required-packages required-features
+        prologue config epilogue)
+    (dolist (arg args)
+      (if (keywordp arg) (setf state arg)
+        (cl-case state
+          (:packages (push arg required-packages))
+          (:features (push arg required-features))
+          (:prologue (push arg prologue))
+          (:config   (push arg config))
+          (:epilogue (push arg epilogue))
+          (otherwise
+           (error "Invalid keyword in setup: %s" arg)))))
+    (let ((epilogue-form
+           (when epilogue
+             `(add-hook 'setup-epilogue-hook
+                        (lambda ()
+                          ,@(nreverse epilogue))
+                        t)))
+          (err (make-symbol "err")))
+      `(condition-case-unless-debug ,err
+           (progn
+             ,@(nreverse prologue)
+             (setup-demand-packages ',required-packages)
+             (setup-demand-features ',required-features)
+             ,@(nreverse config)
+             ,epilogue-form)
+         (error (apply #'setup-error-handler ,err))))))
+
+(add-hook
+ 'window-setup-hook
+ (lambda ()
+   (run-at-time
+    0.02 nil
+    (lambda ()
+      (run-hooks 'setup-epilogue-hook)))))
+#+END_SRC
+
+Most users of `setup' may want to activate `setup-demote-errors' to make
+the Emacs startup more robust. This configuration does already handle all
+arising errors and can therefore use `error'.
+
+#+BEGIN_SRC emacs-lisp
+(setf setup-demote-errors nil)
+#+END_SRC
+
+Now that the setup facility is in place, it is possible to add a first
+epilog function, which is to prompt the user whether all the missing
+dependencies during initialization are to be installed.
+
+#+BEGIN_SRC emacs-lisp
+(setup
+  :epilogue
+  (when init.el-missing-packages
+    (let ((use-dialog-box nil))
+      (when (yes-or-no-p
+             (format
+              "Install missing packages: %s "
+              init.el-missing-packages))
+        (mapc #'package-install
+              init.el-missing-packages)
+        (message
+         "Missing packages installed, please restart Emacs.")))))
 #+END_SRC
 
 ** The Emacs Package Manager
@@ -308,25 +374,10 @@ undo chains. The undo tree mode brings speed and clarity in this respect by
 showing the true nature of the undo history as a tree with suitable
 navigation commands.
 #+BEGIN_SRC emacs-lisp
-(setup undo-tree
-  (:ensure t)
-  (:config
-   (setf undo-tree-visualizer-timestamps t)))
-#+END_SRC
-
-** Rainbow delimiters
-Many programming languages gain additional clarity if pairs of matching
-delimiters are coloured differently. The rainbow delimiters mode does just
-that.
-#+BEGIN_SRC emacs-lisp
-(setup rainbow-delimiters
-  (:ensure t))
-#+END_SRC
-
-** Color highlighting with Rainbow Mode
-#+BEGIN_SRC emacs-lisp
-(setup rainbow-mode
-  (:ensure t))
+(setup
+  :packages undo-tree
+  :config
+  (setf undo-tree-visualizer-timestamps t))
 #+END_SRC
 
 ** The Evil Mode
@@ -334,32 +385,29 @@ The [[info:evil][Evil Mode]] is the most sophisticated Vi emulation for Emacs, a
 section describes how to set it up.
 
 #+BEGIN_SRC emacs-lisp
-(setup ace-jump-mode
-  (:ensure t))
+(setup
+  :packages evil
+  :config
+  (evil-mode 1)
+  (setf evil-want-C-w-in-emacs-state t)
+  (setf evil-echo-state nil)
+  (setf evil-cjk-emacs-word-boundary t)
+  (setf evil-want-C-i-jump nil)
+  (setf evil-want-C-w-delete nil)
 
-(setup evil
-  (:ensure t)
-  (:config
-   (evil-mode 1)
-   (setf evil-want-C-w-in-emacs-state t)
-   (setf evil-echo-state nil)
-   (setf evil-cjk-emacs-word-boundary t)
-   (setf evil-want-C-i-jump nil)
-   (setf evil-want-C-w-delete nil)
-
-   (defun enable-evil-motion-state ()
-     "Useful for major mode hooks to evable evil motion state
+  (defun enable-evil-motion-state ()
+    "Useful for major mode hooks to evable evil motion state
 unconditionally."
-     (evil-motion-state 1))
+    (evil-motion-state 1))
 
-   (setf evil-emacs-state-tag " Ⓔ ")
-   (setf evil-normal-state-tag " Ⓝ ")
-   (setf evil-insert-state-tag " Ⓘ ")
-   (setf evil-motion-state-tag " Ⓜ ")
-   (setf evil-multiedit-insert-state-tag " ∀Ⓘ ")
-   (setf evil-multiedit-state-tag " ∀Ⓝ ")
-   (setf evil-operator-state-tag " Ⓞ ")
-   (setf evil-visual-state-tag " Ⓥ ")))
+  (setf evil-emacs-state-tag " Ⓔ ")
+  (setf evil-normal-state-tag " Ⓝ ")
+  (setf evil-insert-state-tag " Ⓘ ")
+  (setf evil-motion-state-tag " Ⓜ ")
+  (setf evil-multiedit-insert-state-tag " ∀Ⓘ ")
+  (setf evil-multiedit-state-tag " ∀Ⓝ ")
+  (setf evil-operator-state-tag " Ⓞ ")
+  (setf evil-visual-state-tag " Ⓥ "))
 #+END_SRC
 
 ** Recording Emacs sessions with Camcorder
@@ -367,57 +415,53 @@ Some Emacs features are better explained with a short demonstration video
 than many words. The camcorder package allows to record Emacs sessions in
 many video formats.
 #+BEGIN_SRC emacs-lisp
-(setup camcorder
-  (:ensure t)
-  (:config
-   (define-key global-map (kbd "<f12>")
-     'camcorder-mode)))
+(setup
+  :packages camcorder
+  :config
+  (define-key global-map (kbd "<f12>")
+    'camcorder-mode))
 #+END_SRC
 
 ** Monitoring the Battery
 #+BEGIN_SRC emacs-lisp
-(setup battery
-  (:ensure t)
-  (:config
-   (setf battery-mode-line-format "🔋 %p%%%%")
-   (setf battery-update-interval 5)
-   (display-battery-mode 1)))
+(setup
+  :packages battery
+  :config
+  (setf battery-mode-line-format "🔋 %p%%%%")
+  (setf battery-update-interval 5)
+  (display-battery-mode 1))
 #+END_SRC
 
 ** The Insidious Big Brother Database for Emacs
 #+BEGIN_SRC emacs-lisp
-(setup bbdb
-  (:ensure t)
-  (:config
-   (setf bbdb-default-country "Germany"
-         bbdb-file "~/.emacs.d/bbdb"
-         bbdb-gui t
-         bbdb-north-american-phone-numbers-p nil)
-   (bbdb-initialize)))
+(setup
+  :packages bbdb
+  :config
+  (setf bbdb-default-country "Germany"
+        bbdb-file "~/.emacs.d/bbdb"
+        bbdb-gui t
+        bbdb-north-american-phone-numbers-p nil)
+  (bbdb-initialize))
 #+END_SRC
 
 ** Automatical Text Completion with Company
 #+BEGIN_SRC emacs-lisp
-(setup company-auctex
-  (:ensure t))
+(setup
+  :packages company
+  :config
+  (setf company-idle-delay 0.02)
+  (setf company-minimum-prefix-length 1)
 
-(setup company
-  (:ensure t)
-  (:config
-   (setf company-idle-delay 0.02)
-   (setf company-minimum-prefix-length 1)
-   (company-auctex-init)
+  (defun enable-company-mode ()
+    (company-mode 1))
 
-   (defun enable-company-mode ()
-     (company-mode 1))
+  (add-hook 'lisp-mode-hook 'enable-company-mode)
 
-   (add-hook 'lisp-mode-hook 'enable-company-mode)
-
-   (defun indent-or-complete ()
-     (interactive)
-     (if (looking-at "\\_>")
-         (company-complete-common)
-       (indent-according-to-mode)))))
+  (defun indent-or-complete ()
+    (interactive)
+    (if (looking-at "\\_>")
+        (company-complete-common)
+      (indent-according-to-mode))))
 #+END_SRC
 
 ** Multiple Cursors
@@ -425,42 +469,39 @@ A convenient feature, especially when it comes to renaming multiple
 occurences of a variable in source code. In its simplest form, it suffices
 to mark a word and press `R' to edit all its occurences at the same time.
 #+BEGIN_SRC emacs-lisp
-(setup iedit
-  (:ensure t))
+(setup
+  :packages evil-multiedit iedit
+  :config
+  (define-key evil-visual-state-map "R"
+    'evil-multiedit-match-all)
 
-(setup evil-multiedit
-  (:ensure t)
-  (:config
-   (define-key evil-visual-state-map "R"
-     'evil-multiedit-match-all)
+  (define-key evil-normal-state-map (kbd "M-d")
+    'evil-multiedit-match-and-next)
+  (define-key evil-visual-state-map (kbd "M-d")
+    'evil-multiedit-match-and-next)
 
-   (define-key evil-normal-state-map (kbd "M-d")
-     'evil-multiedit-match-and-next)
-   (define-key evil-visual-state-map (kbd "M-d")
-     'evil-multiedit-match-and-next)
+  (define-key evil-normal-state-map (kbd "M-D")
+    'evil-multiedit-match-and-prev)
+  (define-key evil-visual-state-map (kbd "M-D")
+    'evil-multiedit-match-and-prev)
 
-   (define-key evil-normal-state-map (kbd "M-D")
-     'evil-multiedit-match-and-prev)
-   (define-key evil-visual-state-map (kbd "M-D")
-     'evil-multiedit-match-and-prev)
+  (define-key evil-visual-state-map (kbd "C-M-D")
+    'evil-multiedit-restore)
 
-   (define-key evil-visual-state-map (kbd "C-M-D")
-     'evil-multiedit-restore)
+  (define-key evil-multiedit-state-map (kbd "RET")
+    'evil-multiedit-toggle-or-restrict-region)
 
-   (define-key evil-multiedit-state-map (kbd "RET")
-     'evil-multiedit-toggle-or-restrict-region)
+  (define-key evil-visual-state-map (kbd "RET")
+    'evil-multiedit-toggle-or-restrict-region)
 
-   (define-key evil-visual-state-map (kbd "RET")
-     'evil-multiedit-toggle-or-restrict-region)
-
-   (define-key evil-multiedit-state-map (kbd "C-n")
-     'evil-multiedit-next)
-   (define-key evil-multiedit-state-map (kbd "C-p")
-     'evil-multiedit-prev)
-   (define-key evil-multiedit-insert-state-map (kbd "C-n")
-     'evil-multiedit-next)
-   (define-key evil-multiedit-insert-state-map (kbd "C-p")
-     'evil-multiedit-prev)))
+  (define-key evil-multiedit-state-map (kbd "C-n")
+    'evil-multiedit-next)
+  (define-key evil-multiedit-state-map (kbd "C-p")
+    'evil-multiedit-prev)
+  (define-key evil-multiedit-insert-state-map (kbd "C-n")
+    'evil-multiedit-next)
+  (define-key evil-multiedit-insert-state-map (kbd "C-p")
+    'evil-multiedit-prev))
 #+END_SRC
 
 ** Openwith mode - Open certain buffers with external tools
@@ -471,22 +512,54 @@ to adapt the variable `openwith-associations' to suit ones personal
 preferences.
 
 #+BEGIN_SRC emacs-lisp
-(setup openwith
-  (:ensure t)
-  (:config
-   (openwith-mode)
-   (setf openwith-associations
-         ;; note: no openwith-opening of .ps files or imaxima misbehaves
-         '(("\\.\\(?:dvi\\|pdf\\|ps.gz\\|djvu\\)\\'"
-            "evince" (file))
-           ("\\.jar\\'"
-            "java -jar" (file))
-           ("\\.\\(?:odt\\|odt\\|fodt\\|uot\\|docx\\|docx\\)\\'"
-            "libreoffice" (file))
-           ("\\.xcf\\'"
-            "gimp" (file))
-           ("\\.\\(?:mp3\\|wav\\|mp4\\|mpe?g\\|avi\\|flac\\|ogg\\|wma\\|m4a\\|mkv\\)\\'"
-            "vlc" (file))))))
+(setup
+  :packages openwith
+  :config
+  (openwith-mode)
+  (setf openwith-associations
+        ;; note: no openwith-opening of .ps files or imaxima misbehaves
+        '(("\\.\\(?:dvi\\|pdf\\|ps.gz\\|djvu\\)\\'"
+           "evince" (file))
+          ("\\.jar\\'"
+           "java -jar" (file))
+          ("\\.\\(?:odt\\|odt\\|fodt\\|uot\\|docx\\|docx\\)\\'"
+           "libreoffice" (file))
+          ("\\.xcf\\'"
+           "gimp" (file))
+          ("\\.\\(?:mp3\\|wav\\|mp4\\|mpe?g\\|avi\\|flac\\|ogg\\|wma\\|m4a\\|mkv\\)\\'"
+           "vlc" (file)))))
+#+END_SRC
+
+** Incremental Completion with Helm
+#+BEGIN_SRC emacs-lisp
+(setup
+  :packages helm
+  :config
+  (require 'helm-config)
+  (setq helm-candidate-number-limit 100)
+
+  (setf helm-display-header-line nil
+        helm-prevent-escaping-from-minibuffer t
+        helm-split-window-in-side-p t
+        helm-quick-update t
+        helm-always-two-windows t
+        helm-echo-input-in-header-line t
+        helm-imenu-execute-action-at-once-if-one nil
+        helm-move-to-line-cycle-in-source t
+        helm-ff-search-library-in-sexp t
+        helm-ff-file-name-history-use-recentf t)
+
+  (setf helm-M-x-fuzzy-match t
+        helm-apropos-fuzzy-match t
+        helm-file-cache-fuzzy-match t
+        helm-imenu-fuzzy-match t
+        helm-lisp-fuzzy-completion t
+        helm-recentf-fuzzy-match t
+        helm-semantic-fuzzy-match t
+        helm-buffers-fuzzy-matching t)
+
+  (helm-autoresize-mode -1)
+  (helm-mode -1))
 #+END_SRC
 
 ** Regular Expression Building
@@ -496,34 +569,36 @@ and replace facility, but sometimes useful for complex regular expressions
 with multiple grouping constructs.
 
 #+BEGIN_SRC emacs-lisp
-(setup re-builder
-  (:config
-   (setf reb-re-syntax 'read)))
+(setup
+  :features re-builder
+  :config
+  (setf reb-re-syntax 'read))
 #+END_SRC
 
 ** Bibliographic References with Reftex
 
 #+BEGIN_SRC emacs-lisp
-(setup reftex
-  (:ensure t)
-  (:config
-   (defun org-mode-reftex-setup ()
-     (interactive)
-     (and (buffer-file-name) (file-exists-p (buffer-file-name))
-          (progn
-            ;; Reftex should use the org file as master file. See C-h v TeX-master for infos.
-            (setf TeX-master t)
-            (turn-on-reftex)
-            (reftex-parse-all)
-            ;; add a custom reftex cite format to insert links
-            ;; This also changes any call to org-citation!
-            (reftex-set-cite-format
-             '((?c . "\\cite{%l}")
-               (?t . "\\citet{%l}") ; natbib inline text
-               (?i . "\\citep{%l}") ; natbib with parens
-               )))))
-   (define-key org-mode-map (kbd "C-c r") 'reftex-citation)
-   (add-hook 'org-mode-hook 'org-mode-reftex-setup)))
+(setup
+  :packages reftex
+  :config
+  (defun org-mode-reftex-setup ()
+    (interactive)
+    (and (buffer-file-name) (file-exists-p (buffer-file-name))
+         (progn
+           ;; Reftex should use the org file as master file. See C-h v TeX-master for infos.
+           (setf TeX-master t)
+           (turn-on-reftex)
+           (reftex-parse-all)
+           ;; add a custom reftex cite format to insert links
+           ;; This also changes any call to org-citation!
+           (reftex-set-cite-format
+            '((?c . "\\cite{%l}")
+              (?t . "\\citet{%l}") ; natbib inline text
+              (?i . "\\citep{%l}") ; natbib with parens
+              )))))
+  (define-key org-mode-map (kbd "C-c r") 'reftex-citation)
+  (add-hook 'org-mode-hook 'org-mode-reftex-setup)
+  (add-hook 'org-mode-hook 'visual-line-mode))
 #+END_SRC
 
 ** Image viewing with Emacs
@@ -531,11 +606,11 @@ Emacs can open images but does not rescale them to fit to the buffer. The
 `image+' library scales pictures accordingly.
 
 #+BEGIN_SRC emacs-lisp
-(setup image+
-  (:ensure t)
-  (:config
-   (imagex-global-sticky-mode)
-   (imagex-auto-adjust-mode)))
+(setup
+  :packages image+
+  :config
+  (imagex-global-sticky-mode)
+  (imagex-auto-adjust-mode))
 #+END_SRC
 
 ** Gracefully manage matching Parentheses with Paredit
@@ -543,14 +618,11 @@ Paredit is what separates happy Lisp programmers from those crying about
 superfluous parentheses.
 
 #+BEGIN_SRC emacs-lisp
-(setup paredit
-  (:ensure t))
-
-(setup evil-paredit
-  (:ensure t)
-  (:config
-   (defun enable-evil-paredit-mode ()
-     (evil-paredit-mode 1))))
+(setup
+  :packages paredit evil-paredit
+  :config
+  (defun enable-evil-paredit-mode ()
+    (evil-paredit-mode 1)))
 #+END_SRC
 
 * Major Modes
@@ -562,31 +634,32 @@ between organizing, note taking and programming in amazing ways.
 
 *** Basics
 #+BEGIN_SRC emacs-lisp
-(setup org-plus-contrib
-  (:ensure t)
-  (:init
-   (setf org-export-backends '(ascii html icalendar latex beamer odt)))
-  (:config
-   (setf org-adapt-indentation nil)
-   (setf org-agenda-window-setup (quote current-window))
-   (setf org-catch-invisible-edits 'show)
-   (setf org-default-notes-file "~/.emacs.d/org/notes.org")
-   (setf org-directory "~/.emacs.d/org")
-   (setf org-pretty-entities t)
-   (setf org-pretty-entities-include-sub-superscripts nil)
-   (setf org-return-follows-link t)
-   (setf org-special-ctrl-a/e nil)
-   (setf org-block-begin-line t)
-   (setf org-export-with-timestamps t)
-   (setf org-export-date-timestamp-format "%Y-%m-%d")
-   (setcdr (assoc-string "\\.pdf\\'" org-file-apps) "evince %s")
-   (setq-default org-tag-alist
-                 '(("crypt" . ?c)
-                   ("drill" . ?d)))
-   (add-hook 'org-mode-hook 'org-indent-mode)
-   (global-set-key "\C-cl" 'org-store-link)
-   (global-set-key "\C-ce" 'org-capture)
-   (global-set-key "\C-ca" 'org-agenda)))
+(setup
+  :packages org-plus-contrib
+  :prologue
+  (setf org-export-backends '(ascii html icalendar latex beamer odt))
+  :config
+  (setf org-adapt-indentation nil)
+  (setf org-agenda-window-setup (quote current-window))
+  (setf org-catch-invisible-edits 'show)
+  (setf org-default-notes-file "~/.emacs.d/org/notes.org")
+  (setf org-directory "~/.emacs.d/org")
+  (setf org-pretty-entities t)
+  (setf org-highlight-latex-and-related '(latex))
+  (setf org-pretty-entities-include-sub-superscripts nil)
+  (setf org-return-follows-link t)
+  (setf org-special-ctrl-a/e nil)
+  (setf org-block-begin-line t)
+  (setf org-export-with-timestamps t)
+  (setf org-export-date-timestamp-format "%Y-%m-%d")
+  (setcdr (assoc-string "\\.pdf\\'" org-file-apps) "evince %s")
+  (setq-default org-tag-alist
+                '(("crypt" . ?c)
+                  ("drill" . ?d)))
+  (add-hook 'org-mode-hook 'org-indent-mode)
+  (global-set-key "\C-cl" 'org-store-link)
+  (global-set-key "\C-ce" 'org-capture)
+  (global-set-key "\C-ca" 'org-agenda))
 #+END_SRC
 
 Finally there is this little hack for full fontification of long Org mode
@@ -599,7 +672,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 *** Organizing with Org Agenda
 
 #+BEGIN_SRC emacs-lisp
-(make-directory "~/.emacs.d/eap-playlists" t)
+(make-directory "~/.emacs.d/org" t)
 
 (setf org-agenda-compact-blocks nil)
 (setf org-agenda-files "~/.emacs.d/org/agenda-files.org")
@@ -632,31 +705,32 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
                \"%?\"")))
 #+END_SRC
 
-*** Generating LaTeX from Org mode buffers
+*** Exporting Org mode buffers
 
 #+BEGIN_SRC emacs-lisp
-(setup cdlatex
-  (:ensure t))
+(setup
+  :packages cdlatex org htmlize
+  :config
+  (add-hook 'org-mode-hook 'turn-on-org-cdlatex)
 
-(setf org-latex-create-formula-image-program 'imagemagick)
-(setf org-format-latex-options
-      (plist-put org-format-latex-options :scale 1.6))
-(add-hook 'org-mode-hook 'turn-on-org-cdlatex)
-(setf org-latex-listings 'minted)
-(add-to-list 'org-latex-packages-alist '("" "minted"))
-(setf org-latex-minted-options
-      '(("frame" "single") ("framesep" "6pt")
-        ("mathescape" "true") ("fontsize" "\\footnotesize")))
-(setq
- org-latex-pdf-process
- '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-   "bibtex $(basename %b)"
-   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
-(setq
- LaTeX-command-style
- '((""
-    "%(PDF)%(latex) -shell-escape %(file-line-error) %(extraopts) %S%(PDFout)")))
+  (setf org-latex-create-formula-image-program 'imagemagick)
+  (setf org-format-latex-options
+        (plist-put org-format-latex-options :scale 1.6))
+  (setf org-latex-listings 'minted)
+  (add-to-list 'org-latex-packages-alist '("" "minted"))
+  (setf org-latex-minted-options
+        '(("frame" "single") ("framesep" "6pt")
+          ("mathescape" "true") ("fontsize" "\\footnotesize")))
+  (setq
+   org-latex-pdf-process
+   '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+     "bibtex $(basename %b)"
+     "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+     "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
+  (setq
+   LaTeX-command-style
+   '((""
+      "%(PDF)%(latex) -shell-escape %(file-line-error) %(extraopts) %S%(PDFout)"))))
 #+END_SRC
 
 *** Managing source code with Org Babel
@@ -697,44 +771,26 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 (setq-default org-export-babel-evaluate 'inline-only)
 #+END_SRC
 
-The org-src minor mode allows to edit a single source code block in a
-separate buffer. It is convenient to have the same evil state in both
-buffers.
-
-#+BEGIN_SRC emacs-lisp
-(setup org-src
-  (:config
-   (defun org-src-get-parent-state ()
-     (save-excursion
-       (set-buffer (marker-buffer org-src--beg-marker))
-       evil-state))
-
-   (defun org-src-sync-evil-state ()
-     (when org-src-mode
-         (evil-change-state (org-src-get-parent-state))))
-
-   (add-hook 'org-src-mode-hook 'org-src-sync-evil-state)))
-#+END_SRC
-
 *** Encrypting parts of a buffer with Org Crypt
 #+BEGIN_SRC emacs-lisp
-(setup org-crypt
-  (:config
-   (setf auto-save-default nil)
-   (org-crypt-use-before-save-magic)
-   (setf org-tags-exclude-from-inheritance '("crypt"))
-   (setf org-crypt-key "05369722")))
+(setup
+  :features org-crypt
+  :config
+  (setf auto-save-default nil)
+  (org-crypt-use-before-save-magic)
+  (setf org-tags-exclude-from-inheritance '("crypt"))
+  (setf org-crypt-key "05369722"))
 #+END_SRC
 
 *** Beautiful Presentations with Org Reveal
 
 #+BEGIN_SRC emacs-lisp
-(setup ox-reveal
-  (:ensure t)
-  (:config
-   (setq
-    org-reveal-root
-    "file:///home/marco/.emacs.d/elpa/ox-reveal-2015022.2306/reveal.js")))
+(setup
+  :packages ox-reveal
+  :config
+  (setq
+   org-reveal-root
+   "file:///home/marco/.emacs.d/elpa/ox-reveal-2015022.2306/reveal.js"))
 #+END_SRC
 
 *** Efficient Learning with Org drill
@@ -744,20 +800,22 @@ drill cards, which are nothing more than org subtrees with some metadata and the
 drill session.
 
 #+BEGIN_SRC emacs-lisp
-(setup org-drill
-  (:config
-   ;; prevent drill hints from ruining Latex formulas
-   (setf org-drill-hint-separator "||HINT||")))
+(setup
+  :packages org-plus-contrib
+  :features org-drill
+  :config
+  ;; prevent drill hints from ruining Latex formulas
+  (setf org-drill-hint-separator "||HINT||"))
 #+END_SRC
 
 ** Latex Editing with Auctex
 #+BEGIN_SRC emacs-lisp
-(setup auctex
-  (:ensure t))
-
-(setup latex
-  (:config
-   (setq-default TeX-PDF-mode t)))
+(setup
+  :packages auctex company-auctex
+  :features latex
+  :config
+  (setq-default TeX-PDF-mode t)
+  (company-auctex-init))
 #+END_SRC
 
 ** Directory Browsing with Dired
@@ -766,28 +824,30 @@ simply to activate dired+, another one is to enable recursive copies and enable
 `dired-dwim-target'. The latter allowes to copy and move whole folders between
 adjacent [[info:Emacs#Windows][Emacs windows]].
 #+BEGIN_SRC emacs-lisp
-(setup dired
-  (:config
-   (setf dired-dwim-target t
-         dired-recursive-copies 'top
-         dired-listing-switches "-ahl"
-         dired-auto-revert-buffer t
-         wdired-allow-to-change-permissions 'advanced)))
+(setup
+  :features dired
+  :config
+  (setf dired-dwim-target t
+        dired-recursive-copies 'top
+        dired-recursive-deletes 'top
+        dired-listing-switches "-ahl"
+        dired-auto-revert-buffer t
+        wdired-allow-to-change-permissions 'advanced))
 #+END_SRC
 
 #+BEGIN_SRC emacs-lisp
-(setup dired+
-  (:ensure t)
-  (:config
-   (global-dired-hide-details-mode 1)))
+(setup
+  :packages dired+
+  :config
+  (global-dired-hide-details-mode 1))
 #+END_SRC
 
 Dired narrow is a handy tool to filter the files in a dired buffer.
 #+BEGIN_SRC emacs-lisp
-(setup dired-narrow
-  (:ensure t)
-  (:config
-   (define-key dired-mode-map (kbd "C-x /") 'dired-narrow)))
+(setup
+  :packages dired-narrow
+  :config
+  (define-key dired-mode-map (kbd "C-x /") 'dired-narrow))
 #+END_SRC
 
 Sometimes one wishes to perform quick conversions from one file type to another,
@@ -894,15 +954,16 @@ Objective-C, Java, CORBA IDL (and the variants PSDL and CIDL), Pike and
 AWK code.
 
 #+BEGIN_SRC emacs-lisp
-(setup c-mode
-  (:mode "\\.cl\\'" "\\.frag\\'" "\\.vert\\'")
-  (:config
-   (setf c-basic-offset 4
-         c-hanging-braces-alist (quote set-from-style)
-         c-offsets-alist (quote ((innamespace . 0))))))
-
-(setup java-mode
-  (:mode "\\.jad\\'"))
+(setup
+  :features cc-mode
+  :config
+  (add-to-list 'auto-mode-alist `("\\.cl\\'" . c-mode))
+  (add-to-list 'auto-mode-alist `("\\.frag\\'" . c-mode))
+  (add-to-list 'auto-mode-alist `("\\.vert\\'" . c-mode))
+  (add-to-list 'auto-mode-alist `("\\.jad\\'" . java-mode))
+  (setf c-basic-offset 4
+        c-hanging-braces-alist (quote set-from-style)
+        c-offsets-alist (quote ((innamespace . 0)))))
 #+END_SRC
 
 The Language C++ is the first to my knowledge where Emacs stutters with maximal
@@ -917,47 +978,44 @@ lowered.
 
 ** Common Lisp
 #+BEGIN_SRC emacs-lisp
-(setup slime-company
-  (:ensure t))
+(setup
+  :packages slime slime-company rainbow-delimiters evil-paredit paredit
+  :config
+  (setf inferior-lisp-program "sbcl")
+  (slime-setup
+   '(slime-fancy
+     slime-sbcl-exts
+     slime-cl-indent
+     slime-sprof
+     slime-asdf
+     slime-fancy-inspector
+     slime-company
+     ;;slime-fuzzy
+     slime-autodoc))
 
-(setup slime
-  (:ensure t)
-  (:config
-   (setf inferior-lisp-program "sbcl")
-   (slime-setup
-    '(slime-fancy
-      slime-sbcl-exts
-      slime-cl-indent
-      slime-sprof
-      slime-asdf
-      slime-fancy-inspector
-      slime-company
-      ;;slime-fuzzy
-      slime-autodoc))
+  (setq
+   common-lisp-hyperspec-root
+   "file:/home/marco/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
+  (global-set-key "\C-cs" 'slime-selector)
+  (global-set-key "\C-ch" 'common-lisp-hyperspec)
 
-   (setq
-    common-lisp-hyperspec-root
-    "file:/home/marco/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
-   (global-set-key "\C-cs" 'slime-selector)
-   (global-set-key "\C-ch" 'common-lisp-hyperspec)
+  (define-key slime-mode-map
+    (kbd "C-c m") 'slime-macroexpand-1)
 
-   (define-key slime-mode-map
-     (kbd "C-c m") 'slime-macroexpand-1)
+  (add-hook 'slime-mode-hook 'rainbow-delimiters-mode)
+  (add-hook 'slime-mode-hook 'enable-paredit-mode)
+  (add-hook 'slime-mode-hook 'enable-evil-paredit-mode)
+  (add-hook 'slime-repl-mode-hook 'enable-paredit-mode)
 
-   (add-hook 'slime-mode-hook 'rainbow-delimiters-mode)
-   (add-hook 'slime-mode-hook 'enable-paredit-mode)
-   (add-hook 'slime-mode-hook 'enable-evil-paredit-mode)
-   (add-hook 'slime-repl-mode-hook 'enable-paredit-mode)
+  ;; workaround for paredit on the slime REPL
+  (defun override-slime-repl-bindings-with-paredit ()
+    (define-key slime-repl-mode-map
+      (read-kbd-macro paredit-backward-delete-key) nil))
 
-   ;; workaround for paredit on the slime REPL
-   (defun override-slime-repl-bindings-with-paredit ()
-     (define-key slime-repl-mode-map
-       (read-kbd-macro paredit-backward-delete-key) nil))
+  (add-hook 'slime-repl-mode-hook
+            'override-slime-repl-bindings-with-paredit)
 
-   (add-hook 'slime-repl-mode-hook
-             'override-slime-repl-bindings-with-paredit)
-
-   'override-slime-repl-bindings-with-paredit))
+  'override-slime-repl-bindings-with-paredit)
 #+END_SRC
 
 ** Emacs Lisp
@@ -1013,89 +1071,95 @@ With a prefix argument, perform `macroexpand-all' instead."
           (with-output-to-temp-buffer bufname
             (pp expansion)))))))
 
-(add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
-(add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
-(add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
-(add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
-(add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
+(setup
+  :packages paredit evil-paredit company rainbow-mode rainbow-delimiters
+  :config
+  (add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
+  (add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
+  (add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
+  (add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
+  (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode))
 #+END_SRC
 
 ** Maxima
 #+BEGIN_SRC emacs-lisp
-(setup maxima-mode
-  (:mode "\\.mac\\'"))
+(setup
+  :config
+  (require 'maxima)
+  (add-to-list 'auto-mode-alist `("\\.mac\\'" . maxima-mode)))
 
-(setup imaxima
-  (:config
-   ;; This is a little bugfix, otherwise imaxima decided the equation color
-   ;; was NIL and would fail
-   (setf imaxima-equation-color "#DCDCCC")
+(setup
+  :config
+  (require 'imaxima)
+  ;; This is a little bugfix, otherwise imaxima decided the equation color
+  ;; was NIL and would fail
+  (setf imaxima-equation-color "#DCDCCC")
 
-   (setf imaxima-use-maxima-mode-flag t)
-   (setf imaxima-latex-preamble "
+  (setf imaxima-use-maxima-mode-flag t)
+  (setf imaxima-latex-preamble "
 \\usepackage{concrete}
 \\usepackage{euler}
 ")
-   (setf imaxima-scale-factor 1.4)))
+  (setf imaxima-scale-factor 1.4))
 #+END_SRC
 
 ** Scheme Programming
 #+BEGIN_SRC emacs-lisp
-(setup geiser
-  (:ensure t)
-  (:config
-   (setf geiser-default-implementation "guile")))
-
-(setup scheme-mode
-  (:mode "\\.sc\\'")
-  (:config
-   (setf scheme-program-name "guile")
-   (add-hook 'scheme-mode-hook 'enable-paredit-mode)
-   (add-hook 'scheme-mode-hook 'enable-evil-paredit-mode)
-   (add-hook 'scheme-mode-hook 'enable-company-mode)
-   (add-hook 'scheme-mode-hook 'rainbow-delimiters-mode)))
+(setup
+  :packages geiser paredit evil-paredit company rainbow-delimiters
+  :config
+  (setf geiser-default-implementation "guile")
+  (setf scheme-program-name "guile")
+  (add-to-list 'auto-mode-alist `("\\.sc\\'". scheme-mode))
+  (add-hook 'scheme-mode-hook 'enable-paredit-mode)
+  (add-hook 'scheme-mode-hook 'enable-evil-paredit-mode)
+  (add-hook 'scheme-mode-hook 'enable-company-mode)
+  (add-hook 'scheme-mode-hook 'rainbow-delimiters-mode))
 #+END_SRC
 
 ** Octave like languages
 There is a whole family of programming toolkits for applied mathematics,
 all with similar syntax as Octave.
 #+BEGIN_SRC emacs-lisp
-(setup octave-mode
-  (:mode "\\.sci\\'" "\\.m\\'"))
+(setup
+  :features octave
+  :config
+  (add-to-list 'auto-mode-alist `("\\.sci\\'". octave-mode))
+  (add-to-list 'auto-mode-alist `("\\.m\\'". octave-mode)))
 #+END_SRC
 
 ** Proof General
 Proof General is an Emacs frontend for various Theorem Provers.
 #+BEGIN_SRC emacs-lisp
-(setup proofgeneral
-  (:config
-   (load-file "~/.emacs.d/elisp/ProofGeneral-4.2/generic/proof-site.el")
+(setup
+  :config
+  (load-file "~/.emacs.d/elisp/ProofGeneral-4.2/generic/proof-site.el")
 
-   ;; show-paren-mode does not interact well with the Proof General
-   (add-hook 'proof-ready-for-assistant-hook
-             (lambda () (show-paren-mode 0)))))
+  ;; show-paren-mode does not interact well with the Proof General
+  (add-hook 'proof-ready-for-assistant-hook
+            (lambda () (show-paren-mode 0))))
 #+END_SRC
 
 ** EAP - Music Without Jolts
 #+BEGIN_SRC emacs-lisp
-(setup eap
-  (:ensure "svn co http://svn.gna.org/svn/eap/trunk eap")
-  (:config
-   (make-directory "~/.emacs.d/eap-playlists" t)
+(setup
+  :features eap
+  :config
+  (make-directory "~/.emacs.d/eap-playlists" t)
 
-   (setf eap-music-library
-         "~/userdata/music")
-   (setf eap-playlist-library
-         "~/.emacs.d/eap-playlists")
+  (setf eap-music-library
+        "~/userdata/music")
+  (setf eap-playlist-library
+        "~/.emacs.d/eap-playlists")
 
-   (setf eap-volume-mute 0.00)
+  (setf eap-volume-mute 0.00)
 
-   (setf eap-volume-fade-out-flag nil)
+  (setf eap-volume-fade-out-flag nil)
 
-   (add-hook 'kill-buffer-hook
-             'eap-always-kill-buffer-cleanly)
-   (add-hook 'kill-buffer-hook
-             'eap-always-kill-buffer-cleanly)))
+  (add-hook 'kill-buffer-hook
+            'eap-always-kill-buffer-cleanly)
+  (add-hook 'kill-buffer-hook
+            'eap-always-kill-buffer-cleanly))
 #+END_SRC
 
 * User Interface
@@ -1176,7 +1240,7 @@ time. Second, a prompt for interactive confirmation requires the user to type
 (defalias 'yes-or-no-p 'y-or-n-p)
 #+END_SRC
 
-Now some customization of the hilighting of matching parentheses.
+Now some customization of the highlighting of matching parentheses.
 
 #+BEGIN_SRC emacs-lisp
 (setf show-paren-delay 0
@@ -1215,36 +1279,36 @@ This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
 
 #+BEGIN_SRC emacs-lisp
-(setup zenburn-theme
-  (:ensure t)
-  (:config
-   (load-theme 'zenburn t)
-   (set-face-attribute 'button nil :inherit 'link)))
+(setup
+  :packages zenburn-theme
+  :config
+  (load-theme 'zenburn t)
+  (set-face-attribute 'button nil :inherit 'link))
 
-(setup spacemacs-theme
-  (:ensure t)
-  (:config
-   ;; The spacemacs theme tries to detect whether to give the full color
-   ;; theme or a restricted version. This fails for the Emacs server, so I
-   ;; disable this check
-   (defun always-true (&rest args) t)
+(setup
+  :packages spacemacs-theme
+  :config
+  ;; The spacemacs theme tries to detect whether to give the full color
+  ;; theme or a restricted version. This fails for the Emacs server, so I
+  ;; disable this check
+  (defun always-true (&rest args) t)
 
-   (defun load-spacemacs-theme (&optional frame)
-     (advice-add 'true-color-p :around #'always-true)
-     (load-theme 'spacemacs-dark t)
-     (advice-remove 'true-color-p #'always-true))))
+  (defun load-spacemacs-theme (&optional frame)
+    (advice-add 'true-color-p :around #'always-true)
+    (load-theme 'spacemacs-dark t)
+    (advice-remove 'true-color-p #'always-true)))
 #+END_SRC
 
 The package `powerline' and its derivative `spaceline' make the Emacs mode
 line more beautiful.
 
 #+BEGIN_SRC emacs-lisp
-(setup spaceline
-  (:ensure t)
-  (:config
-   (require 'spaceline-config)
-   (setf powerline-default-separator 'wave)
-   (spaceline-spacemacs-theme)))
+(setup
+  :packages spaceline
+  :config
+  (require 'spaceline-config)
+  (setf powerline-default-separator 'wave)
+  (spaceline-spacemacs-theme))
 #+END_SRC
 
 Org mode presents two options for rendering source code blocks. The default
@@ -1282,68 +1346,66 @@ key chord, that is two keys pressed at almost the same time. The most
 convenient key chord is `jk'.
 
 #+BEGIN_SRC emacs-lisp
-(setup key-chord
-  (:ensure t)
-  (:config
-   (key-chord-mode 1)
-   (setf key-chord-two-keys-delay 0.05)
-   (setf key-chord-one-key-delay 0.14)
+(setup
+  :packages key-chord
+  :config
+  (key-chord-mode 1)
+  (setf key-chord-two-keys-delay 0.05)
+  (setf key-chord-one-key-delay 0.14)
 
-   (key-chord-define global-map
-                     "jk" 'quit-window)
+  (key-chord-define global-map
+                    "jk" 'quit-window)
 
-   (key-chord-define minibuffer-local-map
-                     "jk" 'minibuffer-keyboard-quit)
+  (key-chord-define minibuffer-local-map
+                    "jk" 'minibuffer-keyboard-quit)
 
-   (key-chord-define minibuffer-local-ns-map
-                     "jk" 'minibuffer-keyboard-quit)
+  (key-chord-define minibuffer-local-ns-map
+                    "jk" 'minibuffer-keyboard-quit)
 
-   (key-chord-define minibuffer-local-completion-map
-                     "jk" 'minibuffer-keyboard-quit)
+  (key-chord-define minibuffer-local-completion-map
+                    "jk" 'minibuffer-keyboard-quit)
 
-   (key-chord-define minibuffer-local-must-match-map
-                     "jk" 'minibuffer-keyboard-quit)
+  (key-chord-define minibuffer-local-must-match-map
+                    "jk" 'minibuffer-keyboard-quit)
 
-   (key-chord-define minibuffer-local-isearch-map
-                     "jk" 'minibuffer-keyboard-quit)
+  (key-chord-define minibuffer-local-isearch-map
+                    "jk" 'minibuffer-keyboard-quit)
 
-   (key-chord-define evil-multiedit-state-map
-                     "jk" 'evil-multiedit-abort)
+  (key-chord-define evil-multiedit-state-map
+                    "jk" 'evil-multiedit-abort)
 
-   (key-chord-define evil-multiedit-insert-state-map
-                     "jk" 'evil-multiedit-state)
+  (key-chord-define evil-multiedit-insert-state-map
+                    "jk" 'evil-multiedit-state)
 
-   (key-chord-define evil-visual-state-map
-                     "jk" 'evil-change-to-previous-state)
+  (key-chord-define evil-visual-state-map
+                    "jk" 'evil-change-to-previous-state)
 
-   (key-chord-define evil-insert-state-map
-                     "jk" 'evil-normal-state)
+  (key-chord-define evil-insert-state-map
+                    "jk" 'evil-normal-state)
 
-   (key-chord-define evil-replace-state-map
-                     "jk" 'evil-normal-state)))
+  (key-chord-define evil-replace-state-map
+                    "jk" 'evil-normal-state))
 #+END_SRC
 
 The `jk' keystroke can do even more -- when Evil is already in normal mode,
 leave the current buffer somehow.
 
 #+BEGIN_SRC emacs-lisp
-(setup leave-buffer
-  (:config
-   (defun leave-buffer (prefix)
-     (interactive "P")
-     (cond
-      (org-src-mode
-       (org-edit-src-exit))
-      ((eq major-mode 'dired-mode)
-       (when prefix (quit-window t))
-       (dired-up-directory))
-      ((buffer-file-name)
-       (when prefix (quit-window t))
-       (find-file "."))
-      (t
-       (quit-window prefix))))
+(defun leave-buffer (prefix)
+  (interactive "P")
+  (cond
+   (org-src-mode
+    (org-edit-src-exit))
+   ((eq major-mode 'dired-mode)
+    (when prefix (quit-window t))
+    (dired-up-directory))
+   ((buffer-file-name)
+    (when prefix (quit-window t))
+    (find-file "."))
+   (t
+    (quit-window prefix))))
 
-   (key-chord-define evil-normal-state-map "jk" 'leave-buffer)))
+(key-chord-define evil-normal-state-map "jk" 'leave-buffer)
 #+END_SRC
 
 No bind the key `U' to the awesome Undo-Tree mode, `SPC' to the Ace Jump Word
@@ -1351,11 +1413,12 @@ command that queries for a character and jumps to a matching word and `C-c o' to
 the `occur' command.
 
 #+BEGIN_SRC emacs-lisp
-(setup evil-basic-keybindings
-  (:config
-   (define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
-   (define-key evil-normal-state-map (kbd "SPC") 'evil-ace-jump-word-mode)
-   (define-key evil-normal-state-map (kbd "C-c o") 'occur)))
+(setup
+  :packages ace-jump-mode undo-tree
+  :config
+  (define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
+  (define-key evil-normal-state-map (kbd "SPC") 'evil-ace-jump-word-mode)
+  (define-key evil-normal-state-map (kbd "C-c o") 'occur))
 #+END_SRC
 
 Now a little gem -- `save-if-appropriate'. This function executes a bunch of
@@ -1364,23 +1427,21 @@ buffer. Actually these heuristics work so good, that one can bind this command
 to the very frequently used `evil-normal-state-entry-hook'.
 
 #+BEGIN_SRC emacs-lisp
-(setup save-if-appropriate
-  (:config
-   (defun save-if-appropriate ()
-     "Save the buffer unless saving is unpleasant or meaningless."
-     (let ((appropriate
-            (and
-             (buffer-modified-p) ; there should be modifications
-             (buffer-file-name)  ; there should be a file to save to
-             (file-exists-p (buffer-file-name))
-             (case major-mode
-               ;; no org-crypt tags should be present
-               (org-mode (not (org-map-entries t "+crypt" 'file)))
-               (otherwise t)))))
-       (when appropriate
-         (save-buffer))))
+(defun save-if-appropriate ()
+  "Save the buffer unless saving is unpleasant or meaningless."
+  (let ((appropriate
+         (and
+          (buffer-modified-p) ; there should be modifications
+          (buffer-file-name)  ; there should be a file to save to
+          (file-exists-p (buffer-file-name))
+          (case major-mode
+            ;; no org-crypt tags should be present
+            (org-mode (not (org-map-entries t "+crypt" 'file)))
+            (otherwise t)))))
+    (when appropriate
+      (save-buffer))))
 
-   (add-hook 'evil-insert-state-exit-hook 'save-if-appropriate)))
+(add-hook 'evil-insert-state-exit-hook 'save-if-appropriate)
 #+END_SRC
 
 There are still some Emacs modes around that do not play well with Evil mode. It
@@ -1394,19 +1455,17 @@ would be more convenient if every mode would follow the following rules:
 Now come some humble attempts to make Emacs even more evil.
 
 #+BEGIN_SRC emacs-lisp
-(setup evil-keybindings
-  (:config
-   (key-chord-define Info-mode-map "jk" 'Info-up)
-   (define-key Info-mode-map "n" 'evil-search-next)
-   (define-key Info-mode-map "N" 'evil-search-previous)
-   (define-key Info-mode-map "b" 'Info-history-back)
-   (define-key Info-mode-map "w" 'Info-history-forward)
+(key-chord-define Info-mode-map "jk" 'Info-up)
+(define-key Info-mode-map "n" 'evil-search-next)
+(define-key Info-mode-map "N" 'evil-search-previous)
+(define-key Info-mode-map "b" 'Info-history-back)
+(define-key Info-mode-map "w" 'Info-history-forward)
 
-   (define-key dired-mode-map "n" 'evil-search-next)
-   (define-key dired-mode-map "N" 'evil-search-previous)
+(define-key dired-mode-map "n" 'evil-search-next)
+(define-key dired-mode-map "N" 'evil-search-previous)
 
-   (add-hook 'help-mode-hook 'enable-evil-motion-state)
-   (add-hook 'package-menu-mode-hook 'enable-evil-motion-state)))
+(add-hook 'help-mode-hook 'enable-evil-motion-state)
+(add-hook 'package-menu-mode-hook 'enable-evil-motion-state)
 #+END_SRC
 
 ** Initial Buffers
@@ -1427,21 +1486,21 @@ started. The list contains mostly directories.
 There are some modes that are so omnipresent that they deserve no special
 mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminish' gets rid of them.
 #+BEGIN_SRC emacs-lisp
-(setup diminish
-  (:ensure t)
-  (:config
-   (diminish 'paredit-mode)
-   (diminish 'evil-paredit-mode)
-   (diminish 'global-whitespace-mode)
-   (diminish 'company-mode)
-   (diminish 'rainbow-mode)
-   (diminish 'yas-minor-mode)
-   (diminish 'undo-tree-mode)
-   (diminish 'grab-and-drag-mode)
-   (diminish 'reftex-mode)
-   (diminish 'org-cdlatex-mode)
-   (diminish 'org-indent-mode)
-   (diminish 'eldoc-mode)))
+(setup
+  :packages diminish
+  :config
+  (diminish 'paredit-mode)
+  (diminish 'evil-paredit-mode)
+  (diminish 'global-whitespace-mode)
+  (diminish 'company-mode)
+  (diminish 'rainbow-mode)
+  (diminish 'yas-minor-mode)
+  (diminish 'undo-tree-mode)
+  (diminish 'grab-and-drag-mode)
+  (diminish 'reftex-mode)
+  (diminish 'org-cdlatex-mode)
+  (diminish 'org-indent-mode)
+  (diminish 'eldoc-mode))
 #+END_SRC
 
 ** Finalization
@@ -1453,26 +1512,21 @@ init file was loaded successfully and if not, what went wrong.
 (advice-add 'display-startup-echo-area-message
             :override #'ignore)
 
-(defun summarize-initialization ()
+(setup
+  :epilogue
   (kill-buffer "*Messages*") ;; previous messages are spam
   (let ((errors (length init.el-errors)))
     (if (= 0 errors)
         (message "Initialization successful - happy hacking.")
       (message
-       "There have been %d errors during init:\n%s"
+       "There have been %d error(s) during init:\n%s"
        (length init.el-errors)
        (mapconcat
         (lambda (init.el-error)
-          (pcase-let ((`(,line ,err ,rest) init.el-error))
-            (format "Lines %d+: %s %s" line err rest)))
+          (pcase-let ((`(,line . ,msg) init.el-error))
+            (format "Lines %d+: %s" line msg)))
         init.el-errors
         "\n")))))
-
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (run-at-time
-             0.1 nil
-             #'summarize-initialization)))
 
 'done
 #+END_SRC
@@ -1496,3 +1550,4 @@ Probably it would be useful to re-enable auto-save in some way
 Especially the major mode setup and helm
 *** TODO whitespace mode not enabled everywhere
 *** TODO add dedicated command `jk-magic'
+*** TODO add :package-dependencies and :feature-dependencies to setup

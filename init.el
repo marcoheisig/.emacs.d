@@ -87,7 +87,7 @@ add them to `init.el-errors'."
 (let ((org-confirm-babel-evaluate nil)
       (inhibit-redisplay t) ;; less flickering
       (message-log-max nil) ;; silence
-      (inhibit-message t))
+      (inhibit-message t)) ;; more silence in Emacs 25+
   (org-babel-map-executables nil
     (unless (looking-at org-babel-lob-one-liner-regexp)
       (setf init.el-line (line-number-at-pos))
@@ -103,12 +103,13 @@ add them to `init.el-errors'."
         '(setf load-read-function nil)))
 #+END_SRC
 
-** Ensuring packages and features
+** Ensuring Packages, Features and Files
 Traditionally Emacs loads extensions via the function `require', which
 locates a suitable file containing the matching `provide' form. Those files
 can either be placed manually in the `load-path' variable, or conveniently
 installed with the [[info:Emacs#Package][Emacs package manager]]. The following functions ensure
-the presence of certain packages or features, or signal an error.
+the presence of certain packages, features and files. Errors are signalled
+when something cannot be ensured.
 
 #+BEGIN_SRC emacs-lisp
 (cl-flet ((define-error (name message)
@@ -140,6 +141,11 @@ the presence of certain packages or features, or signal an error.
          (ignore-errors ; ... some dont, ignore their absence
            (require x)))
        required-packages)))
+
+(defun ensure-files (&rest filenames)
+  (dolist (filename filenames)
+    (make-directory (file-name-directory filename) t)
+    (write-region "" nil filename)))
 
 (defun ensure-features* (&rest required-features)
   (let ((missing-features
@@ -341,8 +347,8 @@ load any color theme and get a consistent experience.
 #+END_SRC
 
 * Minor Modes
-The bulk of features within Emacs is provided by different [[info:Elisp#Modes][Modes]]. This chapter
-will describe the use and customization of each individual mode.
+[[info:Emacs#Minor%20Modes][Minor Modes]] add a variety of secondary features to currently edited
+buffers. Any numberr of minor modes can be active at a time.
 ** Undo Tree Mode
 While the default Emacs undo mechanism never forgets past modifications,
 moving to an old state requires moving through the whole history in
@@ -363,7 +369,6 @@ section describes how to set it up.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages evil)
-(evil-mode 1)
 (setf evil-want-C-w-in-emacs-state t)
 (setf evil-echo-state nil)
 (setf evil-cjk-emacs-word-boundary t)
@@ -383,12 +388,14 @@ unconditionally."
 (setf evil-multiedit-state-tag " ∀Ⓝ ")
 (setf evil-operator-state-tag " Ⓞ ")
 (setf evil-visual-state-tag " Ⓥ ")
+(evil-mode 1)
 #+END_SRC
 
 ** Recording Emacs sessions with Camcorder
 Some Emacs features are better explained with a short demonstration video
 than many words. The camcorder package allows to record Emacs sessions in
 many video formats.
+
 #+BEGIN_SRC emacs-lisp
 (ensure-packages camcorder)
 (define-key global-map (kbd "<f12>")
@@ -396,6 +403,9 @@ many video formats.
 #+END_SRC
 
 ** Monitoring the Battery
+Emacs provides a robust battery monitoring facility. This config adds a
+unicode battery Symbol and the charge percentage to the mode line.
+
 #+BEGIN_SRC emacs-lisp
 (ensure-packages battery)
 (setf battery-mode-line-format "🔋 %p%%%%")
@@ -404,6 +414,8 @@ many video formats.
 #+END_SRC
 
 ** The Insidious Big Brother Database for Emacs
+BBDB is a great address database written im Emacs Lisp.
+
 #+BEGIN_SRC emacs-lisp
 (ensure-packages bbdb)
 (setf bbdb-default-country "Germany"
@@ -414,6 +426,10 @@ many video formats.
 #+END_SRC
 
 ** Automatical Text Completion with Company
+When enabled, Company displays possible completion candidates for
+individual words. This is particularly useful in programming modes, where
+the completions include defined functions and variables.
+
 #+BEGIN_SRC emacs-lisp
 (ensure-packages company)
 (setf company-idle-delay 0.02)
@@ -435,6 +451,7 @@ many video formats.
 A convenient feature, especially when it comes to renaming multiple
 occurences of a variable in source code. In its simplest form, it suffices
 to mark a word and press `R' to edit all its occurences at the same time.
+
 #+BEGIN_SRC emacs-lisp
 (ensure-packages evil-multiedit iedit)
 (define-key evil-visual-state-map "R"
@@ -622,7 +639,10 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 *** Organizing with Org Agenda
 
 #+BEGIN_SRC emacs-lisp
-(make-directory "~/.emacs.d/org" t)
+(ensure-files "~/.emacs.d/org/agenda-files.org"
+              "~/.emacs.d/org/cal.org"
+              "~/.emacs.d/org/notes.org"
+              "~/.emacs.d/org/quotes.org")
 
 (setf org-agenda-compact-blocks nil)
 (setf org-agenda-files "~/.emacs.d/org/agenda-files.org")
@@ -752,6 +772,9 @@ drill session.
 #+END_SRC
 
 ** Latex Editing with Auctex
+Auctex is by far the best Latex editing environment on the planet, only
+surpassed by the Org mode Latex export facility and `cdlatex'.
+
 #+BEGIN_SRC emacs-lisp
 (ensure-packages auctex company-auctex)
 (ensure-features latex)
@@ -760,10 +783,12 @@ drill session.
 #+END_SRC
 
 ** Directory Browsing with Dired
-There are numerous little tweaks to enhance the dired usability. One of them is
-simply to activate dired+, another one is to enable recursive copies and enable
-`dired-dwim-target'. The latter allowes to copy and move whole folders between
-adjacent [[info:Emacs#Windows][Emacs windows]].
+Dired is the directory browser in Emacs. There are numerous little tweaks
+to enhance the dired usability. One of them is simply to activate dired+.
+Another one is to enable recursive copies and enable
+`dired-dwim-target'. The latter allowes to copy and move whole folders
+between adjacent [[info:Emacs#Windows][Emacs windows]].
+
 #+BEGIN_SRC emacs-lisp
 (ensure-features dired)
 (setf dired-dwim-target t
@@ -910,6 +935,8 @@ lowered.
 #+END_SRC
 
 ** Common Lisp
+The best programming language on the planet.
+
 #+BEGIN_SRC emacs-lisp
 (ensure-packages slime slime-company rainbow-delimiters evil-paredit paredit)
 (setf inferior-lisp-program "sbcl")
@@ -1063,6 +1090,7 @@ Proof General is an Emacs frontend for various Theorem Provers.
 #+BEGIN_SRC emacs-lisp
 (ensure-features eap)
 (make-directory "~/.emacs.d/eap-playlists" t)
+(make-directory "~/userdata/music" t)
 
 (setf eap-music-library
       "~/userdata/music")
@@ -1084,7 +1112,7 @@ This chapter is concerned with the interaction between Emacs and human
 beings. The aim is to provide a very distraction free environment for the
 experienced Emacs user.
 
-** Simple Modifications
+** Trivial Modifications
 First of all there are dozens of minor modifications that deserve no
 individual explanation beyond the hint that `C-h v' and `C-h f' explain an
 Emacs variable and function, respectively.
@@ -1191,7 +1219,7 @@ org-crypt mode does not work well with auto-save.
       backup-inhibited nil)
 #+END_SRC
 
-** The Color Theme and Modeline
+** The Color Theme and Mode Line
 This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
 
@@ -1392,6 +1420,7 @@ started. The list contains mostly directories.
 ** Cleanup the Mode Line with Diminish
 There are some modes that are so omnipresent that they deserve no special
 mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminish' gets rid of them.
+
 #+BEGIN_SRC emacs-lisp
 (ensure-packages diminish)
 (diminish 'paredit-mode)
@@ -1467,3 +1496,4 @@ Especially the major mode setup and helm
 *** TODO whitespace mode not enabled everywhere
 *** TODO add dedicated command `jk-magic'
 *** TODO derive faces once the first graphical Emacsclient starts
+*** TODO set up and use Gnus

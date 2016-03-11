@@ -48,7 +48,7 @@ chapters.
 These are magic incantations that make this file also a valid Emacs
 `init.el' file. They are only interesting for seasoned Emacs Lisp hackers,
 others may skip this section. For those curious how it is possible to
-`load' this file from Emacs, it may be enlightening to view this file in
+`load' this file from Emacs, it may be enlightening to inspect it using
 `M-x emacs-lisp-mode'.
 
 #+BEGIN_SRC emacs-lisp :eval no :export no :wrap ?"
@@ -68,6 +68,8 @@ error is of the form (LINE ERRORMESSAGE).")
   "Approximation to the currently executed line in this file.")
 
 (defmacro with-buckled-seatbelts (&rest body)
+  "Useful during Emacs initialization. Catch and all errors and
+add them to `init.el-errors'."
   (let ((err (make-symbol "err")))
     `(condition-case-unless-debug ,err
          ,(macroexp-progn body)
@@ -84,7 +86,8 @@ error is of the form (LINE ERRORMESSAGE).")
 (find-file-existing load-file-name)
 (let ((org-confirm-babel-evaluate nil)
       (inhibit-redisplay t) ;; less flickering
-      (message-log-max nil)) ;; silence
+      (message-log-max nil) ;; silence
+      (inhibit-message t))
   (org-babel-map-executables nil
     (unless (looking-at org-babel-lob-one-liner-regexp)
       (setf init.el-line (line-number-at-pos))
@@ -101,15 +104,22 @@ error is of the form (LINE ERRORMESSAGE).")
 #+END_SRC
 
 ** Ensuring packages and features
-Traditionally Emacs installed extensions via the function `require', that
-loaded a suitable file containing the matching `provide' form. Those files
+Traditionally Emacs loads extensions via the function `require', which
+locates a suitable file containing the matching `provide' form. Those files
 can either be placed manually in the `load-path' variable, or conveniently
 installed with the [[info:Emacs#Package][Emacs package manager]]. The following functions ensure
 the presence of certain packages or features, or signal an error.
 
 #+BEGIN_SRC emacs-lisp
-(define-error 'package-error "Missing package(s)")
-(define-error 'feature-error "Missing feature(s)")
+(cl-flet ((define-error (name message)
+            (if (fboundp 'define-error)
+                (define-error name message)
+              (put name
+                   'error-conditions
+                   `(error ,name))
+              (put name 'error-message message))))
+  (define-error 'package-error "Missing package(s)")
+  (define-error 'feature-error "Missing feature(s)"))
 
 (defun ensure-packages* (&rest required-packages)
   (let ((missing-packages
@@ -176,14 +186,6 @@ initialization has finished."
                t)))
 #+END_SRC
 
-Most users of `setup' may want to activate `setup-demote-errors' to make
-the Emacs startup more robust. This configuration does already handle all
-arising errors and can therefore use `error'.
-
-#+BEGIN_SRC emacs-lisp
-(setf setup-demote-errors nil)
-#+END_SRC
-
 ** The Emacs Package Manager
 Most Emacs utilities can nowadays be obtained via the Emacs package
 manager. Other packages can be installed by placing them in the load path. The
@@ -235,6 +237,8 @@ code derives sane values for such faces automatically. As a result, one can
 load any color theme and get a consistent experience.
 
 #+BEGIN_SRC emacs-lisp
+(ensure-packages rainbow-delimiters org dired+)
+
 (defun derive-faces (&rest args)
   (cl-labels
       ((hsl (color-name)
@@ -329,6 +333,7 @@ load any color theme and get a consistent experience.
                            1.0 0.5 0.75 string-fg)
               :weight 'bold)
 
+      ;; run derive-faces after every usage of `load-theme'
       (advice-add 'load-theme :after #'derive-faces))))
 
 (init.el-epilogue
@@ -345,9 +350,11 @@ between. For multiple branches of history, this leads to longer and longer
 undo chains. The undo tree mode brings speed and clarity in this respect by
 showing the true nature of the undo history as a tree with suitable
 navigation commands.
+
 #+BEGIN_SRC emacs-lisp
 (ensure-packages undo-tree)
 (setf undo-tree-visualizer-timestamps t)
+(setf undo-tree-visualizer-diff t)
 #+END_SRC
 
 ** The Evil Mode
@@ -1411,27 +1418,31 @@ init file was loaded successfully and if not, what went wrong.
             :override #'ignore)
 
 (init.el-epilogue
- (kill-buffer "*Messages*") ;; previous messages are spam
- (when init.el-missing-packages
+ ;; apply powerline and drop spam
+ (kill-buffer "*Messages*")
+ (cond
+  (init.el-missing-packages
    (let ((use-dialog-box nil))
      (when (yes-or-no-p
             (format
              "Install missing packages: %s "
              init.el-missing-packages))
        (mapc #'package-install
-             init.el-missing-packages))))
- (let ((nerrors (length init.el-errors)))
-   (if (= 0 nerrors)
-       (message "Initialization successful - happy hacking.")
-     (message
-      "There have been %d error(s) during init:\n%s"
-      nerrors
-      (mapconcat
-       (lambda (init.el-error)
-         (pcase-let ((`(,line . ,msg) init.el-error))
-           (format "Lines %d+: %s" line msg)))
-       init.el-errors
-       "\n")))))
+             init.el-missing-packages)))
+   (message
+    "Missing packages are installed, please restart Emacs."))
+  (init.el-errors
+    (message
+     "There have been %d error(s) during init:\n%s"
+     (length init.el-errors)
+     (mapconcat
+      (lambda (init.el-error)
+        (pcase-let ((`(,line . ,msg) init.el-error))
+          (format "Lines %d+: %s" line msg)))
+      init.el-errors
+      "\n")))
+  (t
+   (message "Initialization successful - happy hacking."))))
 
 'done
 #+END_SRC
@@ -1455,4 +1466,4 @@ Probably it would be useful to re-enable auto-save in some way
 Especially the major mode setup and helm
 *** TODO whitespace mode not enabled everywhere
 *** TODO add dedicated command `jk-magic'
-*** TODO add :package-dependencies and :feature-dependencies to setup
+*** TODO derive faces once the first graphical Emacsclient starts

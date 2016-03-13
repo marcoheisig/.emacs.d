@@ -145,7 +145,8 @@ when something cannot be ensured.
 (defun ensure-files (&rest filenames)
   (dolist (filename filenames)
     (make-directory (file-name-directory filename) t)
-    (write-region "" nil filename)))
+    (unless (file-exists-p filename)
+      (write-region "" nil filename))))
 
 (defun ensure-features* (&rest required-features)
   (let ((missing-features
@@ -498,7 +499,7 @@ preferences.
 (openwith-mode)
 (setf openwith-associations
       ;; note: no openwith-opening of .ps files or imaxima misbehaves
-      '(("\\.\\(?:dvi\\|pdf\\|ps.gz\\|djvu\\)\\'"
+      '(("\\.\\(?:dvi\\|pdfg\\|ps\\.gz\\|djvu\\)\\'"
          "evince" (file))
         ("\\.jar\\'"
          "java -jar" (file))
@@ -1224,11 +1225,10 @@ This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages zenburn-theme)
+(ensure-packages zenburn-theme spacemacs-theme)
 (load-theme 'zenburn t)
 (set-face-attribute 'button nil :inherit 'link)
 
-(ensure-packages spacemacs-theme)
 ;; The spacemacs theme tries to detect whether to give the full color
 ;; theme or a restricted version. This fails for the Emacs server, so I
 ;; disable this check
@@ -1456,6 +1456,7 @@ init file was loaded successfully and if not, what went wrong.
             (format
              "Install missing packages: %s "
              init.el-missing-packages))
+       (package-refresh-contents)
        (mapc #'package-install
              init.el-missing-packages)))
    (message

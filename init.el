@@ -364,6 +364,27 @@ navigation commands.
 (setf undo-tree-visualizer-diff t)
 #+END_SRC
 
+** Flyspell
+Flyspell is an Emacs builtin feature that checks spelling on the fly.
+
+#+BEGIN_SRC emacs-lisp
+(ensure-features flyspell)
+
+(setf flyspell-issue-message-flag nil)
+
+(defun enable-flyspell-prog-mode ()
+  (flyspell-prog-mode 1))
+
+(defun disable-flyspell-prog-mode ()
+  (flyspell-prog-mode -1))
+
+(defun enable-flyspell-mode ()
+  (flyspell-mode 1))
+
+(defun disable-flyspell-mode ()
+  (flyspell-mode -1))
+#+END_SRC
+
 ** The Evil Mode
 The [[info:evil][Evil Mode]] is the most sophisticated Vi emulation for Emacs, and this
 section describes how to set it up.
@@ -499,7 +520,7 @@ preferences.
 (openwith-mode)
 (setf openwith-associations
       ;; note: no openwith-opening of .ps files or imaxima misbehaves
-      '(("\\.\\(?:dvi\\|pdfg\\|ps\\.gz\\|djvu\\)\\'"
+      '(("\\.\\(?:dvi\\|pdf\\|ps\\.gz\\|djvu\\)\\'"
          "evince" (file))
         ("\\.jar\\'"
          "java -jar" (file))
@@ -624,10 +645,12 @@ between organizing, note taking and programming in amazing ways.
 (setq-default org-tag-alist
               '(("crypt" . ?c)
                 ("drill" . ?d)))
-(add-hook 'org-mode-hook 'org-indent-mode)
 (global-set-key "\C-cl" 'org-store-link)
 (global-set-key "\C-ce" 'org-capture)
 (global-set-key "\C-ca" 'org-agenda)
+
+(add-hook 'org-mode-hook 'org-indent-mode)
+(add-hook 'org-mode-hook 'enable-flyspell-mode)
 #+END_SRC
 
 Finally there is this little hack for full fontification of long Org mode
@@ -772,6 +795,26 @@ drill session.
 (setf org-drill-hint-separator "||HINT||")
 #+END_SRC
 
+Below is the helpful bugfix for a org-drill redisplay.
+
+#+BEGIN_QUOTE
+Thanks!  I can reproduce your issue with a relatively fresh emacs 25 and
+org from git.
+
+AFAICS the window gets blanked sometimes in function
+org-toggle-latex-fragment of org.el in line
+
+--8<---------------cut here---------------start------------->8---
+;; Work around a bug that doesn't restore window's start
+;; when widening back the buffer.
+(set-window-start nil window-start)
+--8<---------------cut here---------------end--------------->8---
+
+A workaround would be to comment out just this line.
+
+I don't know if this is a reliable fix though.
+#+END_QUOTE
+
 ** Latex Editing with Auctex
 Auctex is by far the best Latex editing environment on the planet, only
 surpassed by the Org mode Latex export facility and `cdlatex'.
@@ -781,6 +824,7 @@ surpassed by the Org mode Latex export facility and `cdlatex'.
 (ensure-features latex)
 (setq-default TeX-PDF-mode t)
 (company-auctex-init)
+(add-hook 'LaTeX-mode-hook 'enable-flyspell-mode)
 #+END_SRC
 
 ** Directory Browsing with Dired
@@ -923,6 +967,10 @@ AWK code.
 (setf c-basic-offset 4
       c-hanging-braces-alist (quote set-from-style)
       c-offsets-alist (quote ((innamespace . 0))))
+
+(add-hook 'c-mode-hook 'enable-flyspell-prog-mode)
+(add-hook 'c++-mode-hook 'enable-flyspell-prog-mode)
+(add-hook 'java-mode-hook 'enable-flyspell-prog-mode)
 #+END_SRC
 
 The Language C++ is the first to my knowledge where Emacs stutters with maximal
@@ -964,6 +1012,7 @@ The best programming language on the planet.
 (add-hook 'slime-mode-hook 'rainbow-delimiters-mode)
 (add-hook 'slime-mode-hook 'enable-paredit-mode)
 (add-hook 'slime-mode-hook 'enable-evil-paredit-mode)
+(add-hook 'slime-mode-hook 'enable-flyspell-prog-mode)
 (add-hook 'slime-repl-mode-hook 'enable-paredit-mode)
 
 ;; workaround for paredit on the slime REPL
@@ -974,7 +1023,7 @@ The best programming language on the planet.
 (add-hook 'slime-repl-mode-hook
           'override-slime-repl-bindings-with-paredit)
 
-'override-slime-repl-bindings-with-paredit
+
 #+END_SRC
 
 ** Emacs Lisp
@@ -984,58 +1033,59 @@ Emacs Lisp. The only worthwile addition provided here is a simple Macro
 stepper called `macroexpand-point'.
 
 #+BEGIN_SRC emacs-lisp
-  (define-derived-mode emacs-lisp-macroexpand-mode emacs-lisp-mode
-    "Macro Expansion"
-    "Major mode for displaying Emacs Lisp macro expansions."
-    (setf buffer-read-only t))
+(define-derived-mode emacs-lisp-macroexpand-mode emacs-lisp-mode
+  "Macro Expansion"
+  "Major mode for displaying Emacs Lisp macro expansions."
+  (setf buffer-read-only t))
 
-  (define-key emacs-lisp-mode-map
-    (kbd "C-c m") 'macroexpand-point)
+(define-key emacs-lisp-mode-map
+  (kbd "C-c m") 'macroexpand-point)
 
-  (define-key org-mode-map
-    (kbd "C-c m") 'macroexpand-point)
+(define-key org-mode-map
+  (kbd "C-c m") 'macroexpand-point)
 
-  (defun macroexpand-point (arg)
-    "Apply `macroexpand' to the S-expression at point and show
-  the result in a temporary buffer. If already in such a buffer,
-  expand the expression in place.
+(defun macroexpand-point (arg)
+  "Apply `macroexpand' to the S-expression at point and show
+the result in a temporary buffer. If already in such a buffer,
+expand the expression in place.
 
-  With a prefix argument, perform `macroexpand-all' instead."
-    (interactive "P")
-    (let ((bufname "*emacs-lisp-macroexpansion*")
-          (bounds (bounds-of-thing-at-point 'sexp))
-          (expand (if arg #'macroexpand-all #'macroexpand)))
-      (unless bounds
-        (error "No S-expression at point."))
-      (let* ((beg (car bounds))
-             (end (cdr bounds))
-             (expansion
-              (funcall expand
-                       (first
-                        (read-from-string
-                         (buffer-substring beg end))))))
-        (if (eq major-mode 'emacs-lisp-macroexpand-mode)
-            (let ((inhibit-read-only t)
-                  (full-sexp
-                   (car (read-from-string
-                         (concat
-                          (buffer-substring (point-min) beg)
-                          (prin1-to-string expansion)
-                          (buffer-substring end (point-max)))))))
-              (delete-region (point-min) (point-max))
-              (save-excursion
-                (pp full-sexp (current-buffer)))
-              (goto-char beg))
-          (let ((temp-buffer-show-hook '(emacs-lisp-macroexpand-mode)))
-            (with-output-to-temp-buffer bufname
-              (pp expansion)))))))
+With a prefix argument, perform `macroexpand-all' instead."
+  (interactive "P")
+  (let ((bufname "*emacs-lisp-macroexpansion*")
+        (bounds (bounds-of-thing-at-point 'sexp))
+        (expand (if arg #'macroexpand-all #'macroexpand)))
+    (unless bounds
+      (error "No S-expression at point."))
+    (let* ((beg (car bounds))
+           (end (cdr bounds))
+           (expansion
+            (funcall expand
+                     (first
+                      (read-from-string
+                       (buffer-substring beg end))))))
+      (if (eq major-mode 'emacs-lisp-macroexpand-mode)
+          (let ((inhibit-read-only t)
+                (full-sexp
+                 (car (read-from-string
+                       (concat
+                        (buffer-substring (point-min) beg)
+                        (prin1-to-string expansion)
+                        (buffer-substring end (point-max)))))))
+            (delete-region (point-min) (point-max))
+            (save-excursion
+              (pp full-sexp (current-buffer)))
+            (goto-char beg))
+        (let ((temp-buffer-show-hook '(emacs-lisp-macroexpand-mode)))
+          (with-output-to-temp-buffer bufname
+            (pp expansion)))))))
 
-  (ensure-packages paredit evil-paredit company rainbow-mode rainbow-delimiters)
-  (add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
-  (add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
-  (add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
-  (add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
-  (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
+(ensure-packages paredit evil-paredit company rainbow-mode rainbow-delimiters)
+(add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
+(add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
+(add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
+(add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
+(add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
+(add-hook 'emacs-lisp-mode-hook 'enable-flyspell-prog-mode)
 #+END_SRC
 
 ** Maxima
@@ -1066,6 +1116,7 @@ stepper called `macroexpand-point'.
 (add-hook 'scheme-mode-hook 'enable-evil-paredit-mode)
 (add-hook 'scheme-mode-hook 'enable-company-mode)
 (add-hook 'scheme-mode-hook 'rainbow-delimiters-mode)
+(add-hook 'scheme-mode-hook 'enable-flyspell-prog-mode)
 #+END_SRC
 
 ** Octave like languages
@@ -1075,6 +1126,12 @@ all with similar syntax as Octave.
 (ensure-features octave)
 (add-to-list 'auto-mode-alist `("\\.sci\\'". octave-mode))
 (add-to-list 'auto-mode-alist `("\\.m\\'". octave-mode))
+#+END_SRC
+
+** Scala
+#+BEGIN_SRC emacs-lisp
+(ensure-packages scala-mode)
+(add-to-list 'auto-mode-alist `("\\.scala\\'". scala-mode))
 #+END_SRC
 
 ** Proof General
@@ -1423,23 +1480,28 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages diminish)
-(diminish 'paredit-mode)
-(diminish 'evil-paredit-mode)
-(diminish 'global-whitespace-mode)
-(diminish 'company-mode)
-(diminish 'rainbow-mode)
-(diminish 'yas-minor-mode)
-(diminish 'undo-tree-mode)
-(diminish 'grab-and-drag-mode)
-(diminish 'reftex-mode)
-(diminish 'org-cdlatex-mode)
-(diminish 'org-indent-mode)
-(diminish 'eldoc-mode)
+
+(let ((mode-line-bloat
+       '(paredit-mode
+         flyspell-mode
+         flyspell-prog-mode
+         evil-paredit-mode
+         global-whitespace-mode
+         company-mode
+         rainbow-mode
+         yas-minor-mode
+         undo-tree-mode
+         grab-and-drag-mode
+         reftex-mode
+         org-cdlatex-mode
+         org-indent-mode
+         eldoc-mode)))
+  (mapc #'diminish mode-line-bloat))
 #+END_SRC
 
 ** Finalization
 After all initialization is complete, display a nice summary whether the
-init file was loaded successfully and if not, what went wrong.
+initialization file was loaded successfully and if not, what went wrong.
 
 #+BEGIN_SRC emacs-lisp
 (setf inhibit-startup-screen t)
@@ -1498,3 +1560,4 @@ Especially the major mode setup and helm
 *** TODO add dedicated command `jk-magic'
 *** TODO derive faces once the first graphical Emacsclient starts
 *** TODO set up and use Gnus
+*** TODO apply org-drill bug fix

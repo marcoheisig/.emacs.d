@@ -17,18 +17,18 @@ for an amazing Emacs experience. The third chapter [[*Major Modes][Major Modes]]
 configuration sorted by the buffer type it applies to, like the `c-mode'
 for operating on files in the C Language. Most human computer interaction
 is placed separately in the chapter [[*User%20Interface][User Interface]]. Prominent features of
-this chapter are color themes, keybindings, undo and redo, auto completion
+this chapter are color themes, key bindings, undo and redo, auto completion
 and the choice of initial open buffers.
 
 A word of warning -- this configuration file is heavily centered around the
 [[https://www.emacswiki.org/emacs/Evil][Evil mode]]. Seasoned Emacs users might be surprised by the Vi-style
-keybindings. The author had to switch the layout due to pinky finger
+key bindings. The author had to switch the layout due to pinky finger
 exhaustion. This is probably a sign of being unworthy, certainly not that
-the default Emacs keybindings are cumbersome.
+the default Emacs key bindings are cumbersome.
 
 If you are not Marco Heisig and plan to use this configuration, some lines
 should be adapted accordingly. As a helpful starting point, all lines that
-should definitely be reviewed are those containing `marco', `heisig',
+should definitely be reviewed are those containing `Marco', `Heisig',
 `phone' or `crypt-key'.
 
 A final remark -- this configuration is not optimized for load time. It is
@@ -41,7 +41,7 @@ emacsclient -n -c -a ''
 
 * Meta Configuration
 This chapter deals with the nature of Emacs customization, hence the
-`Meta'. It manages paths in the filesystem and utility functions for all other
+`Meta'. It manages paths in the file system and utility functions for all other
 chapters.
 
 ** Loading
@@ -108,7 +108,7 @@ Traditionally Emacs loads extensions via the function `require', which
 locates a suitable file containing the matching `provide' form. Those files
 can either be placed manually in the `load-path' variable, or conveniently
 installed with the [[info:Emacs#Package][Emacs package manager]]. The following functions ensure
-the presence of certain packages, features and files. Errors are signalled
+the presence of certain packages, features and files. Errors are signaled
 when something cannot be ensured.
 
 #+BEGIN_SRC emacs-lisp
@@ -349,7 +349,7 @@ load any color theme and get a consistent experience.
 
 * Minor Modes
 [[info:Emacs#Minor%20Modes][Minor Modes]] add a variety of secondary features to currently edited
-buffers. Any numberr of minor modes can be active at a time.
+buffers. Any number of minor modes can be active at a time.
 ** Undo Tree Mode
 While the default Emacs undo mechanism never forgets past modifications,
 moving to an old state requires moving through the whole history in
@@ -365,7 +365,7 @@ navigation commands.
 #+END_SRC
 
 ** Flyspell
-Flyspell is an Emacs builtin feature that checks spelling on the fly.
+Flyspell is an Emacs built in feature that checks spelling on the fly.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-features flyspell)
@@ -425,8 +425,8 @@ many video formats.
 #+END_SRC
 
 ** Monitoring the Battery
-Emacs provides a robust battery monitoring facility. This config adds a
-unicode battery Symbol and the charge percentage to the mode line.
+Emacs provides a robust battery monitoring facility. This configuration adds a
+Unicode battery symbol and the charge percentage to the mode line.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages battery)
@@ -436,7 +436,7 @@ unicode battery Symbol and the charge percentage to the mode line.
 #+END_SRC
 
 ** The Insidious Big Brother Database for Emacs
-BBDB is a great address database written im Emacs Lisp.
+BBDB is a great address database written in Emacs Lisp.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages bbdb)
@@ -447,7 +447,7 @@ BBDB is a great address database written im Emacs Lisp.
 (bbdb-initialize)
 #+END_SRC
 
-** Automatical Text Completion with Company
+** Automatic Text Completion with Company
 When enabled, Company displays possible completion candidates for
 individual words. This is particularly useful in programming modes, where
 the completions include defined functions and variables.
@@ -471,8 +471,8 @@ the completions include defined functions and variables.
 
 ** Multiple Cursors
 A convenient feature, especially when it comes to renaming multiple
-occurences of a variable in source code. In its simplest form, it suffices
-to mark a word and press `R' to edit all its occurences at the same time.
+occurrences of a variable in source code. In its simplest form, it suffices
+to mark a word and press `R' to edit all its occurrences at the same time.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages evil-multiedit iedit)
@@ -598,7 +598,7 @@ with multiple grouping constructs.
 #+END_SRC
 
 ** Image viewing with Emacs
-Emacs can open images but does not rescale them to fit to the buffer. The
+Emacs can open images but does not re-scale them to fit to the buffer. The
 `image+' library scales pictures accordingly.
 
 #+BEGIN_SRC emacs-lisp
@@ -621,7 +621,7 @@ superfluous parentheses.
 ** The Org Mode
 If Emacs is the place a programmer lives when using his computer, the [[info:org][Org mode]]
 is likely to be his living room. At its core it is a mode for writing
-structured plaintext, but its many extensions allow it to blur the line
+structured plain text, but its many extensions allow it to blur the line
 between organizing, note taking and programming in amazing ways.
 
 *** Basics
@@ -784,7 +784,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 
 *** Efficient Learning with Org drill
 Org drill is an amazing tool to learn new facts. In a first step, one creates
-drill cards, which are nothing more than org subtrees with some metadata and the
+drill cards, which are nothing more than org sub trees with some meta data and the
 `:drill:' tag. Afterwards the command `org-drill' will start a sophisticated
 drill session.
 
@@ -795,10 +795,10 @@ drill session.
 (setf org-drill-hint-separator "||HINT||")
 #+END_SRC
 
-Below is the helpful bugfix for a org-drill redisplay.
+Below is the helpful bug fix for a org-drill redisplay.
 
 #+BEGIN_QUOTE
-Thanks!  I can reproduce your issue with a relatively fresh emacs 25 and
+Thanks!  I can reproduce your issue with a relatively fresh Emacs 25 and
 org from git.
 
 AFAICS the window gets blanked sometimes in function
@@ -831,7 +831,7 @@ surpassed by the Org mode Latex export facility and `cdlatex'.
 Dired is the directory browser in Emacs. There are numerous little tweaks
 to enhance the dired usability. One of them is simply to activate dired+.
 Another one is to enable recursive copies and enable
-`dired-dwim-target'. The latter allowes to copy and move whole folders
+`dired-dwim-target'. The latter allows to copy and move whole folders
 between adjacent [[info:Emacs#Windows][Emacs windows]].
 
 #+BEGIN_SRC emacs-lisp
@@ -856,7 +856,7 @@ Dired narrow is a handy tool to filter the files in a dired buffer.
 #+END_SRC
 
 Sometimes one wishes to perform quick conversions from one file type to another,
-preferably for all currently marked files in a dired buffer. The function
+preferably for all currently marked files in a Dired buffer. The function
 `dired-convert' attempts to perform such a conversion with several
 heuristics. The command is strictly more useful than `dired-compress' and is
 therefore bound to the key `Z' instead.
@@ -1029,7 +1029,7 @@ The best programming language on the planet.
 ** Emacs Lisp
 The language Emacs Lisp is a fine blend of Maclisp, Common Lisp and some
 language for editing text. Unsurprisingly Emacs is well suited for editing
-Emacs Lisp. The only worthwile addition provided here is a simple Macro
+Emacs Lisp. The only worthwhile addition provided here is a simple Macro
 stepper called `macroexpand-point'.
 
 #+BEGIN_SRC emacs-lisp
@@ -1120,8 +1120,8 @@ With a prefix argument, perform `macroexpand-all' instead."
 #+END_SRC
 
 ** Octave like languages
-There is a whole family of programming toolkits for applied mathematics,
-all with similar syntax as Octave.
+There is a whole family of programming tools for applied mathematics, all
+with similar syntax as Octave.
 #+BEGIN_SRC emacs-lisp
 (ensure-features octave)
 (add-to-list 'auto-mode-alist `("\\.sci\\'". octave-mode))
@@ -1135,7 +1135,7 @@ all with similar syntax as Octave.
 #+END_SRC
 
 ** Proof General
-Proof General is an Emacs frontend for various Theorem Provers.
+Proof General is an Emacs front end for various Theorem Provers.
 #+BEGIN_SRC emacs-lisp
 (load-file "~/.emacs.d/elisp/ProofGeneral-4.2/generic/proof-site.el")
 
@@ -1203,7 +1203,7 @@ Emacs variable and function, respectively.
 (setf pop-up-frames nil)
 #+END_SRC
 
-Emacs wizards have memoized all their commands and have no need for visual
+Emacs wizards have memorized all their commands and have no need for visual
 guidance.
 
 #+BEGIN_SRC emacs-lisp
@@ -1230,7 +1230,7 @@ leave them disabled.
 (put 'scroll-right 'disabled nil)
 #+END_SRC
 
-There are two major annoyances in an uncofigured Emacs. First, killing a
+By default, there are two major annoyances in Emacs. First, killing a
 buffer with an attached process asks for confirmation every single
 time. Second, a prompt for interactive confirmation requires the user to type
 `y e s RET' instead of a simple `y'. The next code fixes both these issues.
@@ -1253,7 +1253,7 @@ Now some customization of the highlighting of matching parentheses.
 #+END_SRC
 
 Visually indicate the two major sins in programming: tabs and trailing
-whitespace.
+white space.
 
 #+BEGIN_SRC emacs-lisp
 (setf whitespace-style '(face trailing tab-mark))
@@ -1334,8 +1334,8 @@ background to illustrate the block structure.
             :after #'org-src-fontification--after)
 #+END_SRC
 
-** Keybindings
-The Evil keybindings are great, but there are some cases where they fall
+** Key Bindings
+The Evil key bindings are great, but there are some cases where they fall
 short. The first annoyance is the use of the `ESC' key to quit a mode. A
 useful alternative to `ESC' that is fully on a keyboards home row is to use a
 key chord, that is two keys pressed at almost the same time. The most
@@ -1540,7 +1540,7 @@ initialization file was loaded successfully and if not, what went wrong.
 #+END_SRC
 
 * Possible Improvements
-A list of things that could be improved in this Emacs config
+A list of things that could be improved in this Emacs configuration
 *** TODO The `M-.' is shadowed by `evil-repeat-pop-next', but should jump to a Lisp definition.
 Probably also some other Evil features could be added in SLIME
 *** TODO configure and use doc-view mode
@@ -1558,6 +1558,5 @@ Probably it would be useful to re-enable auto-save in some way
 Especially the major mode setup and helm
 *** TODO whitespace mode not enabled everywhere
 *** TODO add dedicated command `jk-magic'
-*** TODO derive faces once the first graphical Emacsclient starts
 *** TODO set up and use Gnus
 *** TODO apply org-drill bug fix

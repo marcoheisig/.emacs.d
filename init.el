@@ -52,6 +52,8 @@ others may skip this section. For those curious how it is possible to
 `M-x emacs-lisp-mode'.
 
 #+BEGIN_SRC emacs-lisp :eval no :export no :wrap ?"
+(require 'cl-lib) ;; enable Common Lisp features
+
 (defvar init.el-errors '()
   "A list of errors that occured during initialization. Each
 error is of the form (LINE ERRORMESSAGE).")
@@ -67,7 +69,21 @@ error is of the form (LINE ERRORMESSAGE).")
 (defvar init.el-line 0
   "Approximation to the currently executed line in this file.")
 
-(defmacro with-buckled-seatbelts (&rest body)
+(defun init.el-display-summary ()
+  (if (not init.el-errors)
+      (message "Initialization successful - happy hacking.")
+    (message
+     "There have been %d error(s) and %d missing package(s) during init:\n%s"
+     (length init.el-errors)
+     (length init.el-missing-packages)
+     (mapconcat
+      (lambda (init.el-error)
+        (pcase-let ((`(,line . ,msg) init.el-error))
+          (format "Lines %d+: %s" line msg)))
+      init.el-errors
+      "\n"))))
+
+(defmacro init.el-with-error-handling (&rest body)
   "Useful during Emacs initialization. Catch and all errors and
 add them to `init.el-errors'."
   (let ((err (make-symbol "err")))
@@ -75,25 +91,35 @@ add them to `init.el-errors'."
          ,(macroexp-progn body)
        (error
         (push
-         (cons init.el-line
-               (error-message-string,err))
+         (cons init.el-line (error-message-string ,err))
          init.el-errors)))))
 
-(package-initialize) ;; in particular, load org
-(require 'cl-lib) ;; enable Common Lisp features
+(defun init ()
+  "Traverse initialization file and try to execute all its source
+blocks. Any errors that occur are stored in `init.el-errors'."
+  (interactive)
+  (setq init.el-errors '())
+  (setq init.el-missing-packages '())
+  (setq init.el-missing-features '())
 
-;; now execute all relevant org-src blocks
-(find-file-existing load-file-name)
-(let ((org-confirm-babel-evaluate nil)
-      (inhibit-redisplay t) ;; less flickering
-      (message-log-max nil) ;; silence
-      (inhibit-message t)) ;; more silence in Emacs 25+
-  (org-babel-map-executables nil
-    (unless (looking-at org-babel-lob-one-liner-regexp)
-      (setf init.el-line (line-number-at-pos))
-      (with-buckled-seatbelts
-       (org-babel-execute-src-block)))))
-(kill-buffer)
+  ;; now execute all relevant org-src blocks
+  (save-excursion
+    (find-file-existing (or load-file-name "~/.emacs.d/init.el"))
+    (package-initialize) ;; in particular, load org
+    (let ((org-confirm-babel-evaluate nil)
+          (inhibit-redisplay t) ;; less flickering
+          (message-log-max nil) ;; silence
+          (inhibit-message t)) ;; more silence in Emacs 25+
+      (org-babel-map-executables nil
+        (init.el-with-error-handling
+         (unless (looking-at org-babel-lob-one-liner-regexp)
+           (setf init.el-line (line-number-at-pos))
+           (org-babel-execute-src-block))))
+      (kill-buffer "*Messages*") ;; clear *Messages*
+      (revert-buffer nil t)))
+  (init.el-display-summary))
+
+(init)
 
 ;; make `load' skip the rest of this file
 (setf load-read-function
@@ -166,6 +192,22 @@ when something cannot be ensured.
   `(ensure-features*
     ,@(mapcar (lambda (x) `',x)
               required-features)))
+
+(defun install-missing-packages ()
+  "Install all packages that were missing while loading the Emacs
+configuraton. More precisely load all packages in
+`init.el-missing-packages'."
+  (interactive)
+  (if init.el-missing-packages
+    (when (or (not (called-interactively-p 'any))
+              (let ((use-dialog-box nil))
+                (yes-or-no-p
+                 (format "Install missing packages: %s "
+                         init.el-missing-packages))))
+      (package-refresh-contents)
+      (mapc #'package-install
+            init.el-missing-packages))
+    (message "No missing packages need to be installed.")))
 #+END_SRC
 
 ** The Epilogue Hook
@@ -173,7 +215,7 @@ Some things are best run at the end of initialization, even after the
 designated Emacs hooks `emacs-startup-hook' and `window-setup-hook'.
 
 #+BEGIN_SRC emacs-lisp
-(defvar setup-epilogue-hook '()
+(defvar init.el-epilogue-hook '()
   "Hook run after processing all Emacs initialization.")
 
 (add-hook
@@ -182,15 +224,23 @@ designated Emacs hooks `emacs-startup-hook' and `window-setup-hook'.
    (run-at-time
     0.02 nil
     (lambda ()
-      (run-hooks 'setup-epilogue-hook)))))
+      (run-hooks 'init.el-epilogue-hook)))))
 
 (defmacro init.el-epilogue (&rest body)
   "Have the expressions in BODY evaluated briefly after all Emacs
 initialization has finished."
   (when body
-    `(add-hook 'setup-epilogue-hook
+    `(add-hook 'init.el-epilogue-hook
                (lambda () ,@body)
                t)))
+#+END_SRC
+
+Now the epilogue hook can be used to display a nice little summary whether
+the initialization was successful.
+
+#+BEGIN_SRC emacs-lisp
+(init.el-epilogue
+ (init.el-display-summary))
 #+END_SRC
 
 ** The Emacs Package Manager
@@ -371,12 +421,6 @@ Flyspell is an Emacs built in feature that checks spelling on the fly.
 (ensure-features flyspell)
 
 (setf flyspell-issue-message-flag nil)
-
-(defun enable-flyspell-prog-mode ()
-  (flyspell-prog-mode 1))
-
-(defun disable-flyspell-prog-mode ()
-  (flyspell-prog-mode -1))
 
 (defun enable-flyspell-mode ()
   (flyspell-mode 1))
@@ -947,7 +991,7 @@ files or the file under the cursor if the former is empty."
                 (message cmd) ;; be verbose
                 (shell-command cmd))))
           ;; make newly created files appear in dired immediately
-          (revert-buffer)
+          (revert-buffer nil t)
           (redisplay))))))
 
 (define-key dired-mode-map (kbd "Z") 'dired-convert)
@@ -968,9 +1012,9 @@ AWK code.
       c-hanging-braces-alist (quote set-from-style)
       c-offsets-alist (quote ((innamespace . 0))))
 
-(add-hook 'c-mode-hook 'enable-flyspell-prog-mode)
-(add-hook 'c++-mode-hook 'enable-flyspell-prog-mode)
-(add-hook 'java-mode-hook 'enable-flyspell-prog-mode)
+(add-hook 'c-mode-hook 'flyspell-prog-mode)
+(add-hook 'c++-mode-hook 'flyspell-prog-mode)
+(add-hook 'java-mode-hook 'flyspell-prog-mode)
 #+END_SRC
 
 The Language C++ is the first to my knowledge where Emacs stutters with maximal
@@ -1012,7 +1056,7 @@ The best programming language on the planet.
 (add-hook 'slime-mode-hook 'rainbow-delimiters-mode)
 (add-hook 'slime-mode-hook 'enable-paredit-mode)
 (add-hook 'slime-mode-hook 'enable-evil-paredit-mode)
-(add-hook 'slime-mode-hook 'enable-flyspell-prog-mode)
+(add-hook 'slime-mode-hook 'flyspell-prog-mode)
 (add-hook 'slime-repl-mode-hook 'enable-paredit-mode)
 
 ;; workaround for paredit on the slime REPL
@@ -1085,7 +1129,7 @@ With a prefix argument, perform `macroexpand-all' instead."
 (add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
 (add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
 (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'emacs-lisp-mode-hook 'enable-flyspell-prog-mode)
+(add-hook 'emacs-lisp-mode-hook 'flyspell-prog-mode)
 #+END_SRC
 
 ** Maxima
@@ -1116,7 +1160,7 @@ With a prefix argument, perform `macroexpand-all' instead."
 (add-hook 'scheme-mode-hook 'enable-evil-paredit-mode)
 (add-hook 'scheme-mode-hook 'enable-company-mode)
 (add-hook 'scheme-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'scheme-mode-hook 'enable-flyspell-prog-mode)
+(add-hook 'scheme-mode-hook 'flyspell-prog-mode)
 #+END_SRC
 
 ** Octave like languages
@@ -1201,6 +1245,9 @@ Emacs variable and function, respectively.
 (setq-default indicate-empty-lines t)
 (setf initial-scratch-message nil)
 (setf pop-up-frames nil)
+(setf inhibit-startup-screen t)
+(advice-add 'display-startup-echo-area-message
+            :override #'ignore)
 #+END_SRC
 
 Emacs wizards have memorized all their commands and have no need for visual
@@ -1282,19 +1329,9 @@ This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages zenburn-theme spacemacs-theme)
+(ensure-packages zenburn-theme)
 (load-theme 'zenburn t)
 (set-face-attribute 'button nil :inherit 'link)
-
-;; The spacemacs theme tries to detect whether to give the full color
-;; theme or a restricted version. This fails for the Emacs server, so I
-;; disable this check
-(defun always-true (&rest args) t)
-
-(defun load-spacemacs-theme (&optional frame)
-  (advice-add 'true-color-p :around #'always-true)
-  (load-theme 'spacemacs-dark t)
-  (advice-remove 'true-color-p #'always-true))
 #+END_SRC
 
 The package `powerline' and its derivative `spaceline' make the Emacs mode
@@ -1497,46 +1534,6 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
          org-indent-mode
          eldoc-mode)))
   (mapc #'diminish mode-line-bloat))
-#+END_SRC
-
-** Finalization
-After all initialization is complete, display a nice summary whether the
-initialization file was loaded successfully and if not, what went wrong.
-
-#+BEGIN_SRC emacs-lisp
-(setf inhibit-startup-screen t)
-(advice-add 'display-startup-echo-area-message
-            :override #'ignore)
-
-(init.el-epilogue
- ;; apply powerline and drop spam
- (kill-buffer "*Messages*")
- (cond
-  (init.el-missing-packages
-   (let ((use-dialog-box nil))
-     (when (yes-or-no-p
-            (format
-             "Install missing packages: %s "
-             init.el-missing-packages))
-       (package-refresh-contents)
-       (mapc #'package-install
-             init.el-missing-packages)))
-   (message
-    "Missing packages are installed, please restart Emacs."))
-  (init.el-errors
-    (message
-     "There have been %d error(s) during init:\n%s"
-     (length init.el-errors)
-     (mapconcat
-      (lambda (init.el-error)
-        (pcase-let ((`(,line . ,msg) init.el-error))
-          (format "Lines %d+: %s" line msg)))
-      init.el-errors
-      "\n")))
-  (t
-   (message "Initialization successful - happy hacking."))))
-
-'done
 #+END_SRC
 
 * Possible Improvements

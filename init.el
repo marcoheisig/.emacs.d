@@ -94,24 +94,38 @@ add them to `init.el-errors'."
          (cons init.el-line (error-message-string ,err))
          init.el-errors)))))
 
-(defun update-load-path ()
-  (save-excursion
-    (let ((default-directory "~/.emacs.d/elpa/"))
-      (normal-top-level-add-to-load-path '("."))
-      (normal-top-level-add-subdirs-to-load-path))
-    (let ((default-directory "~/.emacs.d/elisp/"))
-      (normal-top-level-add-to-load-path '("."))
-      (normal-top-level-add-subdirs-to-load-path))))
-
-(defun init.el-configure-package ()
-  (make-directory "~/.emacs.d/elisp/" t)
-  (make-directory "~/.emacs.d/elpa/" t)
-  (setf package-archives
-        '(("gnu" . "http://elpa.gnu.org/packages/")
-          ("melpa" . "https://melpa.org/packages/")
-          ("org" . "http://orgmode.org/elpa/")))
-  (update-load-path)
-  (package-initialize))
+(defun init.el-execute-next-src-block ()
+  "Execute the next emacs-lisp source code block. Return T if a
+block was successfully executed and NIL if no block could be
+found."
+  (let ((done nil)
+        (src-regexp
+         (concat
+          (concat
+           ;; (1) indentation                 (2) lang
+           "^\\([ \t]*\\)#\\+begin_src[ \t]+\\([^ \f\t\n\r\v]+\\)[ \t]*"
+           ;; (3) switches
+           "\\([^\":\n]*\"[^\"\n*]*\"[^\":\n]*\\|[^\":\n]*\\)"
+           ;; (4) header arguments
+           "\\([^\n]*\\)\n"
+           ;; (5) body
+           "\\([^\000]*?\n\\)??[ \t]*#\\+end_src"))))
+    (while (and (not done)
+                (re-search-forward src-regexp nil t))
+      (goto-char (match-end 0))
+      (let ((lang (match-string-no-properties 2))
+            (switches (match-string-no-properties 3))
+            (header-args (match-string-no-properties 4))
+            (beg-body (match-beginning 5))
+            (body (match-string 5)))
+        (when (and (string-equal lang "emacs-lisp")
+                   ;; TODO relax the heuristics when to execute a src-block
+                   (string-equal header-args "")
+                   (string-equal switches ""))
+          (setf init.el-line (line-number-at-pos beg-body))
+          (eval (read (concat "(progn " body ")")))
+          (setf done t))))
+    done))
 
 (defun init ()
   "Traverse the initialization file and try to execute all its source
@@ -121,10 +135,6 @@ blocks. Any errors that occur are stored in `init.el-errors'."
   (setq init.el-missing-packages '())
   (setq init.el-missing-features '())
 
-  (init.el-with-error-handling
-   (init.el-configure-package)
-   (package-install 'org-plus-contrib))
-
   ;; now execute all relevant org-src blocks
   (save-excursion
     (find-file-existing (or load-file-name "~/.emacs.d/init.el"))
@@ -132,11 +142,8 @@ blocks. Any errors that occur are stored in `init.el-errors'."
           (inhibit-redisplay t) ;; less flickering
           (message-log-max nil) ;; silence
           (inhibit-message t))  ;; more silence in Emacs 25+
-      (org-babel-map-executables nil
-        (init.el-with-error-handling
-         (unless (looking-at org-babel-lob-one-liner-regexp)
-           (setf init.el-line (line-number-at-pos))
-           (org-babel-execute-src-block))))
+      (while (init.el-with-error-handling
+              (init.el-execute-next-src-block)))
       (kill-buffer "*Messages*") ;; clear *Messages*
       (revert-buffer nil t)))
   (init.el-display-summary))
@@ -276,6 +283,30 @@ information is stored in another independent file.
 #+BEGIN_SRC emacs-lisp
 (setf custom-file "~/.emacs.d/custom.el")
 (load custom-file)
+#+END_SRC
+
+** The Emacs Package Manager
+
+#+BEGIN_SRC emacs-lisp
+(make-directory "~/.emacs.d/elisp/" t)
+(make-directory "~/.emacs.d/elpa/" t)
+
+(defun update-load-path ()
+  (save-excursion
+    (let ((default-directory "~/.emacs.d/elpa/"))
+      (normal-top-level-add-to-load-path '("."))
+      (normal-top-level-add-subdirs-to-load-path))
+    (let ((default-directory "~/.emacs.d/elisp/"))
+      (normal-top-level-add-to-load-path '("."))
+      (normal-top-level-add-subdirs-to-load-path))))
+
+(setf package-archives
+      '(("gnu" . "http://elpa.gnu.org/packages/")
+        ("melpa" . "https://melpa.org/packages/")
+        ("org" . "http://orgmode.org/elpa/")))
+
+(update-load-path)
+(package-initialize)
 #+END_SRC
 
 ** Enhancing Color Themes

@@ -94,22 +94,44 @@ add them to `init.el-errors'."
          (cons init.el-line (error-message-string ,err))
          init.el-errors)))))
 
+(defun update-load-path ()
+  (save-excursion
+    (let ((default-directory "~/.emacs.d/elpa/"))
+      (normal-top-level-add-to-load-path '("."))
+      (normal-top-level-add-subdirs-to-load-path))
+    (let ((default-directory "~/.emacs.d/elisp/"))
+      (normal-top-level-add-to-load-path '("."))
+      (normal-top-level-add-subdirs-to-load-path))))
+
+(defun init.el-configure-package ()
+  (make-directory "~/.emacs.d/elisp/" t)
+  (make-directory "~/.emacs.d/elpa/" t)
+  (setf package-archives
+        '(("gnu" . "http://elpa.gnu.org/packages/")
+          ("melpa" . "https://melpa.org/packages/")
+          ("org" . "http://orgmode.org/elpa/")))
+  (update-load-path)
+  (package-initialize))
+
 (defun init ()
-  "Traverse initialization file and try to execute all its source
+  "Traverse the initialization file and try to execute all its source
 blocks. Any errors that occur are stored in `init.el-errors'."
   (interactive)
   (setq init.el-errors '())
   (setq init.el-missing-packages '())
   (setq init.el-missing-features '())
 
+  (init.el-with-error-handling
+   (init.el-configure-package)
+   (package-install 'org-plus-contrib))
+
   ;; now execute all relevant org-src blocks
   (save-excursion
     (find-file-existing (or load-file-name "~/.emacs.d/init.el"))
-    (package-initialize) ;; in particular, load org
     (let ((org-confirm-babel-evaluate nil)
           (inhibit-redisplay t) ;; less flickering
           (message-log-max nil) ;; silence
-          (inhibit-message t)) ;; more silence in Emacs 25+
+          (inhibit-message t))  ;; more silence in Emacs 25+
       (org-babel-map-executables nil
         (init.el-with-error-handling
          (unless (looking-at org-babel-lob-one-liner-regexp)
@@ -243,35 +265,6 @@ the initialization was successful.
  (init.el-display-summary))
 #+END_SRC
 
-** The Emacs Package Manager
-Most Emacs utilities can nowadays be obtained via the Emacs package
-manager. Other packages can be installed by placing them in the load path. The
-following snippet makes all code in the folders `elpa' and `elisp' accessible to
-Emacs. It seems the most useful package archives (as of 2016) for Emacs are
-Melpa and the Org mode archives.
-
-#+BEGIN_SRC emacs-lisp
-(make-directory "~/.emacs.d/elisp/" t)
-(make-directory "~/.emacs.d/elpa/" t)
-
-(defun update-load-path ()
-  (save-excursion
-    (let ((default-directory "~/.emacs.d/elpa/"))
-      (normal-top-level-add-to-load-path '("."))
-      (normal-top-level-add-subdirs-to-load-path))
-    (let ((default-directory "~/.emacs.d/elisp/"))
-      (normal-top-level-add-to-load-path '("."))
-      (normal-top-level-add-subdirs-to-load-path))))
-
-(setf package-archives
-      '(("gnu" . "http://elpa.gnu.org/packages/")
-        ("melpa" . "https://melpa.org/packages/")
-        ("org" . "http://orgmode.org/elpa/")))
-
-(update-load-path)
-(package-initialize)
-#+END_SRC
-
 ** Customization
 Emacs has a convenient interface for customization, that can be accessed by
 the command `M-x customize'. This configuration does not use the customization
@@ -294,7 +287,7 @@ code derives sane values for such faces automatically. As a result, one can
 load any color theme and get a consistent experience.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages rainbow-delimiters org dired+)
+(ensure-packages rainbow-delimiters org-plus-contrib dired+)
 
 (defun derive-faces (&rest args)
   (cl-labels
@@ -388,10 +381,10 @@ load any color theme and get a consistent experience.
               :foreground (merge-hsl
                            0.0 0.5 0.75 default-bg
                            1.0 0.5 0.75 string-fg)
-              :weight 'bold)
+              :weight 'bold))))
 
-      ;; run derive-faces after every usage of `load-theme'
-      (advice-add 'load-theme :after #'derive-faces))))
+;; run derive-faces after every usage of `load-theme'
+(advice-add 'load-theme :after #'derive-faces)
 
 (init.el-epilogue
  (derive-faces))

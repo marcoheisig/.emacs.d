@@ -197,7 +197,7 @@ when something cannot be ensured.
   (define-error 'package-error "Missing package(s)")
   (define-error 'feature-error "Missing feature(s)"))
 
-(defun ensure-packages* (&rest required-packages)
+(defun ensure-packages (&rest required-packages)
   (let ((missing-packages
          (cl-remove-if #'package-installed-p
                        required-packages)))
@@ -223,7 +223,7 @@ when something cannot be ensured.
     (unless (file-exists-p filename)
       (write-region "" nil filename))))
 
-(defun ensure-features* (&rest required-features)
+(defun ensure-features (&rest required-features)
   (let ((missing-features
          (cl-remove-if
           (lambda (x)
@@ -231,16 +231,6 @@ when something cannot be ensured.
           required-features)))
     (when missing-features
       (signal 'feature-error missing-features))))
-
-(defmacro ensure-packages (&rest required-packages)
-  `(ensure-packages*
-    ,@(mapcar (lambda (x) `',x)
-              required-packages)))
-
-(defmacro ensure-features (&rest required-features)
-  `(ensure-features*
-    ,@(mapcar (lambda (x) `',x)
-              required-features)))
 
 (defun install-missing-packages ()
   "Install all packages that were missing while loading the Emacs
@@ -345,7 +335,7 @@ showing the true nature of the undo history as a tree with suitable
 navigation commands.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages undo-tree)
+(ensure-packages 'undo-tree)
 (setf undo-tree-visualizer-timestamps t)
 (setf undo-tree-visualizer-diff t)
 #+END_SRC
@@ -354,7 +344,7 @@ navigation commands.
 Flyspell is an Emacs built in feature that checks spelling on the fly.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-features flyspell)
+(ensure-features 'flyspell)
 
 (setf flyspell-issue-message-flag nil)
 
@@ -370,7 +360,7 @@ The [[info:evil][Evil Mode]] is the most sophisticated Vi emulation for Emacs, a
 section describes how to set it up.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages evil)
+(ensure-packages 'evil)
 (setf evil-want-C-w-in-emacs-state t)
 (setf evil-echo-state nil)
 (setf evil-cjk-emacs-word-boundary t)
@@ -399,7 +389,7 @@ than many words. The camcorder package allows to record Emacs sessions in
 many video formats.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages camcorder)
+(ensure-packages 'camcorder)
 (define-key global-map (kbd "<f12>")
   'camcorder-mode)
 #+END_SRC
@@ -409,7 +399,7 @@ Emacs provides a robust battery monitoring facility. This configuration adds a
 Unicode battery symbol and the charge percentage to the mode line.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages battery)
+(ensure-packages 'battery)
 (setf battery-mode-line-format "🔋 %p%%%%")
 (setf battery-update-interval 5)
 (display-battery-mode 1)
@@ -419,7 +409,7 @@ Unicode battery symbol and the charge percentage to the mode line.
 BBDB is a great address database written in Emacs Lisp.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages bbdb)
+(ensure-packages 'bbdb)
 (setf bbdb-default-country "Germany"
       bbdb-file "~/.emacs.d/bbdb"
       bbdb-gui t
@@ -433,7 +423,7 @@ individual words. This is particularly useful in programming modes, where
 the completions include defined functions and variables.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages company)
+(ensure-packages 'company)
 (setf company-idle-delay 0.02)
 (setf company-minimum-prefix-length 1)
 
@@ -455,7 +445,7 @@ occurrences of a variable in source code. In its simplest form, it suffices
 to mark a word and press `R' to edit all its occurrences at the same time.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages evil-multiedit iedit)
+(ensure-packages 'evil-multiedit 'iedit)
 (define-key evil-visual-state-map "R"
   'evil-multiedit-match-all)
 
@@ -496,7 +486,7 @@ to adapt the variable `openwith-associations' to suit ones personal
 preferences.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages openwith)
+(ensure-packages 'openwith)
 (openwith-mode)
 (setf openwith-associations
       ;; note: no openwith-opening of .ps files or imaxima misbehaves
@@ -514,8 +504,8 @@ preferences.
 
 ** Incremental Completion with Helm
 #+BEGIN_SRC emacs-lisp
-(ensure-packages helm)
-(ensure-features helm-config)
+(ensure-packages 'helm)
+(ensure-features 'helm-config)
 (setq helm-candidate-number-limit 100)
 
 (setf helm-display-header-line nil
@@ -549,14 +539,14 @@ and replace facility, but sometimes useful for complex regular expressions
 with multiple grouping constructs.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-features re-builder)
+(ensure-features 're-builder)
 (setf reb-re-syntax 'read)
 #+END_SRC
 
 ** Bibliographic References with Reftex
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages reftex)
+(ensure-packages 'reftex)
 (defun org-mode-reftex-setup ()
   (interactive)
   (and (buffer-file-name) (file-exists-p (buffer-file-name))
@@ -582,7 +572,7 @@ Emacs can open images but does not re-scale them to fit to the buffer. The
 `image+' library scales pictures accordingly.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages image+)
+(ensure-packages 'image+)
 (imagex-global-sticky-mode)
 (imagex-auto-adjust-mode)
 #+END_SRC
@@ -592,7 +582,7 @@ Paredit is what separates happy Lisp programmers from those crying about
 superfluous parentheses.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages paredit evil-paredit)
+(ensure-packages 'paredit 'evil-paredit)
 (defun enable-evil-paredit-mode ()
   (evil-paredit-mode 1))
 #+END_SRC
@@ -606,7 +596,7 @@ between organizing, note taking and programming in amazing ways.
 
 *** Basics
 #+BEGIN_SRC emacs-lisp
-(ensure-packages org-plus-contrib)
+(ensure-packages 'org-plus-contrib)
 (setf org-export-backends '(ascii html icalendar latex beamer odt))
 (setf org-adapt-indentation nil)
 (setf org-agenda-window-setup (quote current-window))
@@ -682,7 +672,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 *** Exporting Org mode buffers
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages cdlatex org htmlize)
+(ensure-packages 'cdlatex 'org-plus-contrib 'htmlize)
 (add-hook 'org-mode-hook 'turn-on-org-cdlatex)
 
 (setf org-latex-create-formula-image-program 'imagemagick)
@@ -708,7 +698,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 *** Managing source code with Org Babel
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages org)
+(ensure-packages 'org-plus-contrib)
 (setf org-edit-src-content-indentation 0)
 (org-babel-do-load-languages
  'org-babel-load-languages
@@ -746,7 +736,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 
 *** Encrypting parts of a buffer with Org Crypt
 #+BEGIN_SRC emacs-lisp
-(ensure-features org-crypt)
+(ensure-features 'org-crypt)
 (setf auto-save-default nil)
 (org-crypt-use-before-save-magic)
 (setf org-tags-exclude-from-inheritance '("crypt"))
@@ -756,7 +746,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 *** Beautiful Presentations with Org Reveal
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages ox-reveal)
+(ensure-packages 'ox-reveal)
 (setq
  org-reveal-root
  "file:///home/marco/.emacs.d/elpa/ox-reveal-2015022.2306/reveal.js")
@@ -769,8 +759,8 @@ drill cards, which are nothing more than org sub trees with some meta data and t
 drill session.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages org-plus-contrib)
-(ensure-features org-drill)
+(ensure-packages 'org-plus-contrib)
+(ensure-features 'org-drill)
 ;; prevent drill hints from ruining Latex formulas
 (setf org-drill-hint-separator "||HINT||")
 #+END_SRC
@@ -800,8 +790,8 @@ Auctex is by far the best Latex editing environment on the planet, only
 surpassed by the Org mode Latex export facility and `cdlatex'.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages auctex company-auctex)
-(ensure-features latex)
+(ensure-packages 'auctex 'company-auctex)
+(ensure-features 'latex)
 (setq-default TeX-PDF-mode t)
 (company-auctex-init)
 (add-hook 'LaTeX-mode-hook 'enable-flyspell-mode)
@@ -815,7 +805,7 @@ Another one is to enable recursive copies and enable
 between adjacent [[info:Emacs#Windows][Emacs windows]].
 
 #+BEGIN_SRC emacs-lisp
-(ensure-features dired)
+(ensure-features 'dired)
 (setf dired-dwim-target t
       dired-recursive-copies 'top
       dired-recursive-deletes 'top
@@ -825,13 +815,13 @@ between adjacent [[info:Emacs#Windows][Emacs windows]].
 #+END_SRC
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages dired+)
+(ensure-packages 'dired+)
 (global-dired-hide-details-mode 1)
 #+END_SRC
 
 Dired narrow is a handy tool to filter the files in a dired buffer.
 #+BEGIN_SRC emacs-lisp
-(ensure-packages dired-narrow)
+(ensure-packages 'dired-narrow)
 (define-key dired-mode-map (kbd "C-x /") 'dired-narrow)
 #+END_SRC
 
@@ -939,7 +929,7 @@ Objective-C, Java, CORBA IDL (and the variants PSDL and CIDL), Pike and
 AWK code.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-features cc-mode)
+(ensure-features 'cc-mode)
 (add-to-list 'auto-mode-alist `("\\.cl\\'" . c-mode))
 (add-to-list 'auto-mode-alist `("\\.frag\\'" . c-mode))
 (add-to-list 'auto-mode-alist `("\\.vert\\'" . c-mode))
@@ -967,7 +957,8 @@ lowered.
 The best programming language on the planet.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages slime slime-company rainbow-delimiters evil-paredit paredit)
+(ensure-packages 'slime 'slime-company 'rainbow-delimiters
+                 'evil-paredit 'paredit)
 (setf inferior-lisp-program "sbcl")
 (slime-setup
  '(slime-fancy
@@ -1058,7 +1049,8 @@ With a prefix argument, perform `macroexpand-all' instead."
           (with-output-to-temp-buffer bufname
             (pp expansion)))))))
 
-(ensure-packages paredit evil-paredit company rainbow-mode rainbow-delimiters)
+(ensure-packages 'paredit 'evil-paredit 'company
+                 'rainbow-mode 'rainbow-delimiters)
 (add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
 (add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
 (add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
@@ -1068,10 +1060,10 @@ With a prefix argument, perform `macroexpand-all' instead."
 
 ** Maxima
 #+BEGIN_SRC emacs-lisp
-(ensure-features maxima)
+(ensure-features 'maxima)
 (add-to-list 'auto-mode-alist `("\\.mac\\'" . maxima-mode))
 
-(ensure-features imaxima)
+(ensure-features 'imaxima)
 ;; This is a little bugfix, otherwise imaxima decided the equation color
 ;; was NIL and would fail
 (setf imaxima-equation-color "#DCDCCC")
@@ -1086,7 +1078,8 @@ With a prefix argument, perform `macroexpand-all' instead."
 
 ** Scheme Programming
 #+BEGIN_SRC emacs-lisp
-(ensure-packages geiser paredit evil-paredit company rainbow-delimiters)
+(ensure-packages 'geiser 'paredit 'evil-paredit
+                 'company 'rainbow-delimiters)
 (setf geiser-default-implementation "guile")
 (setf scheme-program-name "guile")
 (add-to-list 'auto-mode-alist `("\\.sc\\'". scheme-mode))
@@ -1100,14 +1093,14 @@ With a prefix argument, perform `macroexpand-all' instead."
 There is a whole family of programming tools for applied mathematics, all
 with similar syntax as Octave.
 #+BEGIN_SRC emacs-lisp
-(ensure-features octave)
+(ensure-features 'octave)
 (add-to-list 'auto-mode-alist `("\\.sci\\'". octave-mode))
 (add-to-list 'auto-mode-alist `("\\.m\\'". octave-mode))
 #+END_SRC
 
 ** Scala
 #+BEGIN_SRC emacs-lisp
-(ensure-packages scala-mode)
+(ensure-packages 'scala-mode)
 (add-to-list 'auto-mode-alist `("\\.scala\\'". scala-mode))
 #+END_SRC
 
@@ -1123,7 +1116,7 @@ Proof General is an Emacs front end for various Theorem Provers.
 
 ** EAP - Music Without Jolts
 #+BEGIN_SRC emacs-lisp
-(ensure-features eap)
+(ensure-features 'eap)
 (make-directory "~/.emacs.d/eap-playlists" t)
 (make-directory "~/userdata/music" t)
 
@@ -1266,7 +1259,7 @@ code derives sane values for such faces automatically. As a result, one can
 load any color theme and get a consistent experience.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages rainbow-delimiters org-plus-contrib dired+)
+(ensure-packages 'rainbow-delimiters 'org-plus-contrib 'dired+)
 
 (defun derive-faces (&rest args)
   (cl-labels
@@ -1374,7 +1367,7 @@ This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages zenburn-theme)
+(ensure-packages 'zenburn-theme)
 (load-theme 'zenburn t)
 (set-face-attribute 'button nil :inherit 'link)
 #+END_SRC
@@ -1383,8 +1376,8 @@ The package `powerline' and its derivative `spaceline' make the Emacs mode
 line more beautiful.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages spaceline)
-(ensure-features spaceline-config)
+(ensure-packages 'spaceline)
+(ensure-features 'spaceline-config)
 (setf powerline-default-separator 'wave)
 (spaceline-spacemacs-theme)
 #+END_SRC
@@ -1424,7 +1417,7 @@ key chord, that is two keys pressed at almost the same time. The most
 convenient key chord is `jk'.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages key-chord)
+(ensure-packages 'key-chord)
 (key-chord-mode 1)
 (setf key-chord-two-keys-delay 0.05)
 (setf key-chord-one-key-delay 0.14)
@@ -1489,7 +1482,7 @@ command that queries for a character and jumps to a matching word and `C-c o' to
 the `occur' command.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages ace-jump-mode undo-tree)
+(ensure-packages 'ace-jump-mode 'undo-tree)
 (define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
 (define-key evil-normal-state-map (kbd "SPC") 'evil-ace-jump-word-mode)
 (define-key evil-normal-state-map (kbd "C-c o") 'occur)
@@ -1561,7 +1554,7 @@ There are some modes that are so omnipresent that they deserve no special
 mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminish' gets rid of them.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages diminish)
+(ensure-packages 'diminish)
 
 (let ((mode-line-bloat
        '(paredit-mode

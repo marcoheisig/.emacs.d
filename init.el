@@ -67,7 +67,8 @@ error is of the form (MARKER . MESSAGE).")
   but could not be required.")
 
 (defvar init.el-marker (make-marker)
-  "Approximation to the currently executed position in init.el.")
+  "Approximation to the currently executed position in
+  init.el. Used to generate accurate error messages.")
 
 (defun init.el-display-summary ()
   (if (not init.el-errors)
@@ -79,7 +80,7 @@ error is of the form (MARKER . MESSAGE).")
      (mapconcat
       (lambda (init.el-error)
         (pcase-let ((`(,marker . ,msg) init.el-error))
-          (format "Lines %d+: %s"
+          (format "Line %d: %s"
                   (save-excursion
                     (set-buffer (marker-buffer marker))
                     (line-number-at-pos (marker-position marker)))
@@ -104,7 +105,6 @@ add them to `init.el-errors'."
 block was successfully executed and NIL if no block could be
 found."
   (let ((block-executed? nil)
-        (expression nil)
         (buffer (current-buffer))
         (src-regexp
          (concat
@@ -129,14 +129,17 @@ found."
                    ;; TODO relax the heuristics when to execute a src-block
                    (string-equal header-args "")
                    (string-equal switches ""))
+          ;; a suitable block is found, execute it carefully
           (save-restriction
             (goto-char beg-body)
             (narrow-to-region beg-body end-body)
-            (while (progn
-                     (set-marker init.el-marker (1+ (point)) buffer)
-                     (setf expression (ignore-errors (read buffer))))
+            (while (scan-sexps (point) 1)
               (save-window-excursion
-                (eval expression)))
+                (eval
+                 (prog1 (read buffer)
+                   (set-marker init.el-marker
+                               (scan-sexps (point) -1)
+                               buffer)))))
             (setf block-executed? t)))
         (goto-char end-block)))
     block-executed?))
@@ -150,17 +153,21 @@ blocks. Any errors that occur are stored in `init.el-errors'."
   (setq init.el-missing-features '())
 
   ;; now execute all relevant org-src blocks
-  (save-window-excursion
-    (find-file-existing (or load-file-name "~/.emacs.d/init.el"))
-    (let ((org-confirm-babel-evaluate nil)
-          (inhibit-redisplay t) ;; less flickering
-          (message-log-max nil) ;; silence
-          (inhibit-message t))  ;; more silence in Emacs 25+
+  (let ((inhibit-redisplay (not init-file-debug)) ;; less flickering
+        (message-log-max init-file-debug)         ;; silence
+        (inhibit-message (not init-file-debug))   ;; more silence in Emacs 25+
+        (filename (or load-file-name "~/.emacs.d/init.el")))
+    (save-window-excursion
+      (find-file-existing filename)
+      (emacs-lisp-mode) ;; make forward-sexp etc. behave well
       (while (init.el-with-error-handling
               (init.el-execute-next-src-block)))
-      (kill-buffer "*Messages*") ;; clear *Messages*
-      (revert-buffer nil t)))
-  (init.el-display-summary))
+      (unless init-file-debug
+        (kill-buffer "*Messages*")) ;; clear *Messages*
+      (goto-char (point-min))
+      (org-mode)))
+  (when (interactive-p)
+    (init.el-display-summary)))
 
 (init)
 

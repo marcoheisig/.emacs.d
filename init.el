@@ -56,7 +56,7 @@ others may skip this section. For those curious how it is possible to
 
 (defvar init.el-errors '()
   "A list of errors that occured during initialization. Each
-error is of the form (LINE ERRORMESSAGE).")
+error is of the form (MARKER . MESSAGE).")
 
 (defvar init.el-missing-packages '()
   "A list of packages that were demanded during initialization,
@@ -66,8 +66,8 @@ error is of the form (LINE ERRORMESSAGE).")
   "A list of features that were demanded during initialization,
   but could not be required.")
 
-(defvar init.el-line 0
-  "Approximation to the currently executed line in this file.")
+(defvar init.el-marker (make-marker)
+  "Approximation to the currently executed position in init.el.")
 
 (defun init.el-display-summary ()
   (if (not init.el-errors)
@@ -78,8 +78,12 @@ error is of the form (LINE ERRORMESSAGE).")
      (length init.el-missing-packages)
      (mapconcat
       (lambda (init.el-error)
-        (pcase-let ((`(,line . ,msg) init.el-error))
-          (format "Lines %d+: %s" line msg)))
+        (pcase-let ((`(,marker . ,msg) init.el-error))
+          (format "Lines %d+: %s"
+                  (save-excursion
+                    (set-buffer (marker-buffer marker))
+                    (line-number-at-pos (marker-position marker)))
+                  msg)))
       init.el-errors
       "\n"))))
 
@@ -91,14 +95,17 @@ add them to `init.el-errors'."
          ,(macroexp-progn body)
        (error
         (push
-         (cons init.el-line (error-message-string ,err))
+         (cons (copy-marker init.el-marker)
+               (error-message-string ,err))
          init.el-errors)))))
 
 (defun init.el-execute-next-src-block ()
   "Execute the next emacs-lisp source code block. Return T if a
 block was successfully executed and NIL if no block could be
 found."
-  (let ((done nil)
+  (let ((block-executed? nil)
+        (expression nil)
+        (buffer (current-buffer))
         (src-regexp
          (concat
           (concat
@@ -110,22 +117,29 @@ found."
            "\\([^\n]*\\)\n"
            ;; (5) body
            "\\([^\000]*?\n\\)??[ \t]*#\\+end_src"))))
-    (while (and (not done)
+    (while (and (not block-executed?)
                 (re-search-forward src-regexp nil t))
-      (goto-char (match-end 0))
       (let ((lang (match-string-no-properties 2))
             (switches (match-string-no-properties 3))
             (header-args (match-string-no-properties 4))
             (beg-body (match-beginning 5))
-            (body (match-string 5)))
+            (end-body (match-end 5))
+            (end-block (match-end 0)))
         (when (and (string-equal lang "emacs-lisp")
                    ;; TODO relax the heuristics when to execute a src-block
                    (string-equal header-args "")
                    (string-equal switches ""))
-          (setf init.el-line (line-number-at-pos beg-body))
-          (eval (read (concat "(progn " body ")")))
-          (setf done t))))
-    done))
+          (save-restriction
+            (goto-char beg-body)
+            (narrow-to-region beg-body end-body)
+            (while (progn
+                     (set-marker init.el-marker (1+ (point)) buffer)
+                     (setf expression (ignore-errors (read buffer))))
+              (save-window-excursion
+                (eval expression)))
+            (setf block-executed? t)))
+        (goto-char end-block)))
+    block-executed?))
 
 (defun init ()
   "Traverse the initialization file and try to execute all its source
@@ -136,7 +150,7 @@ blocks. Any errors that occur are stored in `init.el-errors'."
   (setq init.el-missing-features '())
 
   ;; now execute all relevant org-src blocks
-  (save-excursion
+  (save-window-excursion
     (find-file-existing (or load-file-name "~/.emacs.d/init.el"))
     (let ((org-confirm-babel-evaluate nil)
           (inhibit-redisplay t) ;; less flickering
@@ -281,7 +295,10 @@ In order to avoid interference with custom set variables, the customize
 information is stored in another independent file.
 
 #+BEGIN_SRC emacs-lisp
-(setf custom-file "~/.emacs.d/custom.el")
+(let ((filename "~/.emacs.d/custom.el"))
+  (ensure-files filename)
+  (setf custom-file filename))
+
 (load custom-file)
 #+END_SRC
 
@@ -306,6 +323,7 @@ information is stored in another independent file.
         ("org" . "http://orgmode.org/elpa/")))
 
 (update-load-path)
+
 (package-initialize)
 #+END_SRC
 

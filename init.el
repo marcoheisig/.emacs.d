@@ -108,15 +108,14 @@ found."
         (buffer (current-buffer))
         (src-regexp
          (concat
-          (concat
-           ;; (1) indentation                 (2) lang
-           "^\\([ \t]*\\)#\\+begin_src[ \t]+\\([^ \f\t\n\r\v]+\\)[ \t]*"
-           ;; (3) switches
-           "\\([^\":\n]*\"[^\"\n*]*\"[^\":\n]*\\|[^\":\n]*\\)"
-           ;; (4) header arguments
-           "\\([^\n]*\\)\n"
-           ;; (5) body
-           "\\([^\000]*?\n\\)??[ \t]*#\\+end_src"))))
+          ;; (1) indentation                 (2) lang
+          "^\\([ \t]*\\)#\\+begin_src[ \t]+\\([^ \f\t\n\r\v]+\\)[ \t]*"
+          ;; (3) switches
+          "\\([^\":\n]*\"[^\"\n*]*\"[^\":\n]*\\|[^\":\n]*\\)"
+          ;; (4) header arguments
+          "\\([^\n]*\\)\n"
+          ;; (5) body
+          "\\([^\000]*?\n\\)??[ \t]*#\\+end_src")))
     (while (and (not block-executed?)
                 (re-search-forward src-regexp nil t))
       (let ((lang (match-string-no-properties 2))
@@ -156,9 +155,9 @@ blocks. Any errors that occur are stored in `init.el-errors'."
   (let ((inhibit-redisplay (not init-file-debug)) ;; less flickering
         (message-log-max init-file-debug)         ;; silence
         (inhibit-message (not init-file-debug))   ;; more silence in Emacs 25+
-        (filename (or load-file-name "~/.emacs.d/init.el")))
+        (init-file (or load-file-name "~/.emacs.d/init.el")))
     (save-window-excursion
-      (find-file-existing filename)
+      (find-file-existing init-file)
       (emacs-lisp-mode) ;; make forward-sexp etc. behave well
       (while (init.el-with-error-handling
               (init.el-execute-next-src-block)))
@@ -334,118 +333,6 @@ information is stored in another independent file.
 (package-initialize)
 #+END_SRC
 
-** Enhancing Color Themes
-In Emacs terminology, rendering attributes of each character are called
-[[info:Elisp#faces][Faces]]. Traditionally a color theme defines the appearance of each
-face. However hardly any color theme is exhaustive and sets colors like
-`rainbow-delimiters-depth-9-face' or `org-block-begin-line'. The following
-code derives sane values for such faces automatically. As a result, one can
-load any color theme and get a consistent experience.
-
-#+BEGIN_SRC emacs-lisp
-(ensure-packages rainbow-delimiters org-plus-contrib dired+)
-
-(defun derive-faces (&rest args)
-  (cl-labels
-      ((hsl (color-name)
-            (apply #'color-rgb-to-hsl
-                   (color-name-to-rgb color-name)))
-       (hue-clamp (value)
-                  (- value (floor value)))
-       (merge-hsl
-        (wh1 ws1 wl1 color1 wh2 ws2 wl2 color2)
-        (cl-multiple-value-bind (h1 s1 l1) (hsl color1)
-          (cl-multiple-value-bind (h2 s2 l2) (hsl color2)
-            (apply
-             #'color-rgb-to-hex
-             (color-hsl-to-rgb
-              (hue-clamp   (+ (* wh1 h1) (* wh2 h2)))
-              (color-clamp (+ (* ws1 s1) (* ws2 s2)))
-              (color-clamp (+ (* wl1 l1) (* wl2 l2))))))))
-       (respec (face &rest arguments)
-               (when (member face (face-list))
-                 (face-spec-reset-face face)
-                 (apply #'set-face-attribute
-                        face nil
-                        arguments))))
-    (redraw-display) ;; make theme change actually happen
-    (let* ((default-bg (face-background 'default))
-           (default-fg (face-foreground 'default))
-           (string-fg (face-foreground
-                       'font-lock-string-face
-                       nil 'default))
-           (comment-fg (face-foreground
-                        'font-lock-comment-face
-                        nil 'default))
-           (block-bg (merge-hsl
-                      1.0 1.0 0.9 default-bg
-                      0.0 0.0 0.1 default-fg)))
-
-      ;; Derive suitable colors for org-blocks
-      (respec 'org-block-begin-line
-              :background block-bg
-              :foreground comment-fg)
-      (respec 'org-block-end-line
-              :inherit 'org-block-begin-line)
-      (respec 'org-block
-              :background (merge-hsl
-                           0.0 0.3 0.3 default-bg
-                           1.0 0.7 0.7 block-bg)
-              :inherit 'unspecified)
-
-      ;; Make rainbow-delimiters actually a rainbow
-      (dotimes (i 9)
-        (let ((face
-               (intern
-                (format "rainbow-delimiters-depth-%d-face"
-                        (+ i 1)))))
-          (respec face
-                  :foreground
-                  (merge-hsl
-                   1.0 1.0 1.0 default-fg
-                   (+ 0.5 (* i 0.166)) 0.8 0.0 "#ff00ff"))))
-
-      ;; dired+ faces
-      (respec 'diredp-compressed-file-suffix :inherit 'font-lock-comment-face)
-      (respec 'diredp-file-suffix :inherit 'font-lock-comment-face)
-      (respec 'diredp-date-time :inherit 'font-lock-comment-face)
-      (respec 'diredp-dir-heading :inherit 'org-block-begin-line)
-      (respec 'diredp-dir-name :inherit 'dired-directory)
-      (respec 'diredp-symlink :inherit 'font-lock-constant-face)
-      (respec 'diredp-file-name :inherit 'default)
-      (respec 'diredp-ignored-file-name :inherit 'font-lock-comment-face)
-      (respec 'diredp-number :inherit 'font-lock-constant-face)
-      (respec 'diredp-flag-mark :inherit 'highlight)
-      (respec 'diredp-flag-mark-line :inherit 'highlight)
-      (respec 'diredp-deletion :inherit 'warning)
-      (respec 'diredp-deletion-file-name :inherit 'warning)
-      (respec 'diredp-dir-priv :inherit 'dired-directory)
-      (respec 'diredp-read-priv :inherit 'rainbow-delimiters-depth-1-face)
-      (respec 'diredp-write-priv :inherit 'rainbow-delimiters-depth-2-face)
-      (respec 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-3-face)
-      (respec 'diredp-link-priv :inherit 'default)
-      (respec 'diredp-rare-priv :inherit 'default)
-
-      ;; regexp-grouping constructs should have the same color as the
-      ;; `font-lock-string-face', but different emphasis.
-      (respec 'font-lock-regexp-grouping-backslash
-              :foreground (merge-hsl
-                           0.0 0.5 0.5 default-bg
-                           1.0 0.5 0.5 string-fg))
-
-      (respec 'font-lock-regexp-grouping-construct
-              :foreground (merge-hsl
-                           0.0 0.5 0.75 default-bg
-                           1.0 0.5 0.75 string-fg)
-              :weight 'bold))))
-
-;; run derive-faces after every usage of `load-theme'
-(advice-add 'load-theme :after #'derive-faces)
-
-(init.el-epilogue
- (derive-faces))
-#+END_SRC
-
 * Minor Modes
 [[info:Emacs#Minor%20Modes][Minor Modes]] add a variety of secondary features to currently edited
 buffers. Any number of minor modes can be active at a time.
@@ -617,7 +504,7 @@ preferences.
          "evince" (file))
         ("\\.jar\\'"
          "java -jar" (file))
-        ("\\.\\(?:odt\\|odt\\|fodt\\|uot\\|docx\\|docx\\)\\'"
+        ("\\.\\(?:odt\\|fodt\\|uot\\|docx\\|docx\\)\\'"
          "libreoffice" (file))
         ("\\.xcf\\'"
          "gimp" (file))
@@ -1105,7 +992,6 @@ The best programming language on the planet.
 (add-hook 'slime-mode-hook 'rainbow-delimiters-mode)
 (add-hook 'slime-mode-hook 'enable-paredit-mode)
 (add-hook 'slime-mode-hook 'enable-evil-paredit-mode)
-(add-hook 'slime-mode-hook 'flyspell-prog-mode)
 (add-hook 'slime-repl-mode-hook 'enable-paredit-mode)
 
 ;; workaround for paredit on the slime REPL
@@ -1178,7 +1064,6 @@ With a prefix argument, perform `macroexpand-all' instead."
 (add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
 (add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
 (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'emacs-lisp-mode-hook 'flyspell-prog-mode)
 #+END_SRC
 
 ** Maxima
@@ -1209,7 +1094,6 @@ With a prefix argument, perform `macroexpand-all' instead."
 (add-hook 'scheme-mode-hook 'enable-evil-paredit-mode)
 (add-hook 'scheme-mode-hook 'enable-company-mode)
 (add-hook 'scheme-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'scheme-mode-hook 'flyspell-prog-mode)
 #+END_SRC
 
 ** Octave like languages
@@ -1371,6 +1255,118 @@ org-crypt mode does not work well with auto-save.
       auto-save-list-file-prefix "~/.emacs.d/auto-save/save-"
       backup-directory-alist (quote (("." . "~/.emacs.d/saves")))
       backup-inhibited nil)
+#+END_SRC
+
+** Color Theme Enhancements
+In Emacs terminology, rendering attributes of each character are called
+[[info:Elisp#faces][Faces]]. Traditionally a color theme defines the appearance of each
+face. However hardly any color theme is exhaustive and sets colors like
+`rainbow-delimiters-depth-9-face' or `org-block-begin-line'. The following
+code derives sane values for such faces automatically. As a result, one can
+load any color theme and get a consistent experience.
+
+#+BEGIN_SRC emacs-lisp
+(ensure-packages rainbow-delimiters org-plus-contrib dired+)
+
+(defun derive-faces (&rest args)
+  (cl-labels
+      ((hsl (color-name)
+            (apply #'color-rgb-to-hsl
+                   (color-name-to-rgb color-name)))
+       (hue-clamp (value)
+                  (- value (floor value)))
+       (merge-hsl
+        (wh1 ws1 wl1 color1 wh2 ws2 wl2 color2)
+        (cl-multiple-value-bind (h1 s1 l1) (hsl color1)
+          (cl-multiple-value-bind (h2 s2 l2) (hsl color2)
+            (apply
+             #'color-rgb-to-hex
+             (color-hsl-to-rgb
+              (hue-clamp   (+ (* wh1 h1) (* wh2 h2)))
+              (color-clamp (+ (* ws1 s1) (* ws2 s2)))
+              (color-clamp (+ (* wl1 l1) (* wl2 l2))))))))
+       (respec (face &rest arguments)
+               (when (member face (face-list))
+                 (face-spec-reset-face face)
+                 (apply #'set-face-attribute
+                        face nil
+                        arguments))))
+    (redraw-display) ;; make theme change actually happen
+    (let* ((default-bg (face-background 'default))
+           (default-fg (face-foreground 'default))
+           (string-fg (face-foreground
+                       'font-lock-string-face
+                       nil 'default))
+           (comment-fg (face-foreground
+                        'font-lock-comment-face
+                        nil 'default))
+           (block-bg (merge-hsl
+                      1.0 1.0 0.9 default-bg
+                      0.0 0.0 0.1 default-fg)))
+
+      ;; Derive suitable colors for org-blocks
+      (respec 'org-block-begin-line
+              :background block-bg
+              :foreground comment-fg)
+      (respec 'org-block-end-line
+              :inherit 'org-block-begin-line)
+      (respec 'org-block
+              :background (merge-hsl
+                           0.0 0.3 0.3 default-bg
+                           1.0 0.7 0.7 block-bg)
+              :inherit 'unspecified)
+
+      ;; Make rainbow-delimiters actually a rainbow
+      (dotimes (i 9)
+        (let ((face
+               (intern
+                (format "rainbow-delimiters-depth-%d-face"
+                        (+ i 1)))))
+          (respec face
+                  :foreground
+                  (merge-hsl
+                   1.0 1.0 1.0 default-fg
+                   (+ 0.5 (* i 0.166)) 0.8 0.0 "#ff00ff"))))
+
+      ;; dired+ faces
+      (respec 'diredp-compressed-file-suffix :inherit 'font-lock-comment-face)
+      (respec 'diredp-file-suffix :inherit 'font-lock-comment-face)
+      (respec 'diredp-date-time :inherit 'font-lock-comment-face)
+      (respec 'diredp-dir-heading :inherit 'org-block-begin-line)
+      (respec 'diredp-dir-name :inherit 'dired-directory)
+      (respec 'diredp-symlink :inherit 'font-lock-constant-face)
+      (respec 'diredp-file-name :inherit 'default)
+      (respec 'diredp-ignored-file-name :inherit 'font-lock-comment-face)
+      (respec 'diredp-number :inherit 'font-lock-constant-face)
+      (respec 'diredp-flag-mark :inherit 'highlight)
+      (respec 'diredp-flag-mark-line :inherit 'highlight)
+      (respec 'diredp-deletion :inherit 'warning)
+      (respec 'diredp-deletion-file-name :inherit 'warning)
+      (respec 'diredp-dir-priv :inherit 'dired-directory)
+      (respec 'diredp-read-priv :inherit 'rainbow-delimiters-depth-1-face)
+      (respec 'diredp-write-priv :inherit 'rainbow-delimiters-depth-2-face)
+      (respec 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-3-face)
+      (respec 'diredp-link-priv :inherit 'default)
+      (respec 'diredp-rare-priv :inherit 'default)
+
+      ;; regexp-grouping constructs should have the same color as the
+      ;; `font-lock-string-face', but different emphasis.
+      (respec 'font-lock-regexp-grouping-backslash
+              :foreground (merge-hsl
+                           0.0 0.5 0.5 default-bg
+                           1.0 0.5 0.5 string-fg))
+
+      (respec 'font-lock-regexp-grouping-construct
+              :foreground (merge-hsl
+                           0.0 0.5 0.75 default-bg
+                           1.0 0.5 0.75 string-fg)
+              :weight 'bold))))
+
+;; run derive-faces after every usage of `load-theme'
+(advice-add 'load-theme :after #'derive-faces)
+
+(init.el-epilogue
+ (derive-faces))
 #+END_SRC
 
 ** The Color Theme and Mode Line

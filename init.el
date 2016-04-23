@@ -106,7 +106,7 @@ block was successfully executed and NIL if no block could be
 found."
   (let ((block-executed? nil)
         (buffer (current-buffer))
-        (src-regexp
+        (src-regexp ;; copy paste from org mode's ob-core.el
          (concat
           ;; (1) indentation                 (2) lang
           "^\\([ \t]*\\)#\\+begin_src[ \t]+\\([^ \f\t\n\r\v]+\\)[ \t]*"
@@ -116,6 +116,7 @@ found."
           "\\([^\n]*\\)\n"
           ;; (5) body
           "\\([^\000]*?\n\\)??[ \t]*#\\+end_src")))
+    ;; scan for org babel source code blocks
     (while (and (not block-executed?)
                 (re-search-forward src-regexp nil t))
       (let ((lang (match-string-no-properties 2))
@@ -128,10 +129,11 @@ found."
                    ;; TODO relax the heuristics when to execute a src-block
                    (string-equal header-args "")
                    (string-equal switches ""))
-          ;; a suitable block is found, execute it carefully
+          ;; a suitable source code block is found, execute it cautiously
+          (goto-char beg-body)
           (save-restriction
-            (goto-char beg-body)
             (narrow-to-region beg-body end-body)
+            ;; execute each s-expression individually
             (while (scan-sexps (point) 1)
               (save-window-excursion
                 (eval
@@ -154,10 +156,9 @@ blocks. Any errors that occur are stored in `init.el-errors'."
   ;; now execute all relevant org-src blocks
   (let ((inhibit-redisplay (not init-file-debug)) ;; less flickering
         (message-log-max init-file-debug)         ;; silence
-        (inhibit-message (not init-file-debug))   ;; more silence in Emacs 25+
-        (init-file (or load-file-name "~/.emacs.d/init.el")))
+        (inhibit-message (not init-file-debug)))  ;; more silence in Emacs 25+
     (save-window-excursion
-      (find-file-existing init-file)
+      (find-file-existing user-init-file)
       (emacs-lisp-mode) ;; make forward-sexp etc. behave well
       (while (init.el-with-error-handling
               (init.el-execute-next-src-block)))
@@ -412,8 +413,7 @@ BBDB is a great address database written in Emacs Lisp.
 (ensure-packages 'bbdb)
 (setf bbdb-default-country "Germany"
       bbdb-file "~/.emacs.d/bbdb"
-      bbdb-gui t
-      bbdb-north-american-phone-numbers-p nil)
+      bbdb-gui t)
 (bbdb-initialize)
 #+END_SRC
 
@@ -437,6 +437,11 @@ the completions include defined functions and variables.
   (if (looking-at "\\_>")
       (company-complete-common)
     (indent-according-to-mode)))
+
+(define-key company-active-map (kbd "\C-n") 'company-select-next)
+(define-key company-active-map (kbd "\C-p") 'company-select-previous)
+(define-key company-active-map (kbd "\C-d") 'company-show-doc-buffer)
+(define-key company-active-map (kbd "M-.") 'company-show-location)
 #+END_SRC
 
 ** Multiple Cursors
@@ -765,7 +770,7 @@ drill session.
 (setf org-drill-hint-separator "||HINT||")
 #+END_SRC
 
-Below is the helpful bug fix for a org-drill redisplay.
+Below is the helpful bug fix for a org-drill redisplay issue.
 
 #+BEGIN_QUOTE
 Thanks!  I can reproduce your issue with a relatively fresh Emacs 25 and
@@ -838,7 +843,7 @@ therefore bound to the key `Z' instead.
   :group 'dired)
 
 (defcustom dired-convert-extraction-associations
-  '(("\\.\\(?:gz\\|tgz\\|bz2\\|xz\\|zip\\|rar\\)\\'"
+  '(("\\.\\(?:gz\\|tgz\\|bz2\\|xz\\|zip\\|rar\\|7z\\)\\'"
      "7z" "x" src)
     ("\\.tar\\'"
      "tar" "xpf" src))
@@ -886,6 +891,8 @@ files or the file under the cursor if the former is empty."
   (cl-flet
       ((cmdize
         (src dst elements)
+        (when (null elements)
+          (error "Do not know how to operate on %s\n" src))
         (mapconcat
          (lambda (x)
            (shell-quote-argument
@@ -914,7 +921,7 @@ files or the file under the cursor if the former is empty."
                             (lambda (x)
                               (string-match x key))
                             assocs :key #'car)))))
-                (message cmd) ;; be verbose
+                (message "%s" cmd) ;; be verbose
                 (shell-command cmd))))
           ;; make newly created files appear in dired immediately
           (revert-buffer nil t)
@@ -954,7 +961,18 @@ lowered.
 #+END_SRC
 
 ** Common Lisp
-The best programming language on the planet.
+One of the best programming languages on the planet - and thanks to the
+effort of many great programmers, it is as of 2016 more pleasant to use
+than ever. The [[https://www.common-lisp.net][Common Lisp website]] is a good start for all those who want
+to start learning this programming language. Because as Eric S. Raymond put
+it:
+
+#+BEGIN_QUOTE
+Lisp is worth learning for the profound enlightenment experience you will
+have when you finally get it; that experience will make you a better
+programmer for the rest of your days, even if you never actually use Lisp
+itself a lot.
+#+END_QUOTE
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'slime 'slime-company 'rainbow-delimiters

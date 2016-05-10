@@ -1,4 +1,4 @@
-" -*- mode: org; coding: utf-8; no-byte-compile: t; -*-
+" -*- coding: utf-8; no-byte-compile: t; -*-
 #+TITLE: Marco Heisig's Emacs configuration
 #+EMAIL: marco.heisig@fau.de
 #+PROPERTY: header-args:emacs-lisp :results value silent
@@ -165,6 +165,7 @@ blocks. Any errors that occur are stored in `init.el-errors'."
       (unless init-file-debug
         (kill-buffer "*Messages*")) ;; clear *Messages*
       (goto-char (point-min))
+      (revert-buffer nil 1)
       (org-mode)))
   (when (interactive-p)
     (init.el-display-summary)))
@@ -567,7 +568,6 @@ with multiple grouping constructs.
             (?t . "\\citet{%l}") ; natbib inline text
             (?i . "\\citep{%l}") ; natbib with parens
             )))))
-(define-key org-mode-map (kbd "C-c r") 'reftex-citation)
 (add-hook 'org-mode-hook 'org-mode-reftex-setup)
 (add-hook 'org-mode-hook 'visual-line-mode)
 #+END_SRC
@@ -602,6 +602,7 @@ between organizing, note taking and programming in amazing ways.
 *** Basics
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'org-plus-contrib)
+(require 'org)
 (setf org-export-backends '(ascii html icalendar latex beamer odt))
 (setf org-adapt-indentation nil)
 (setf org-agenda-window-setup (quote current-window))
@@ -616,7 +617,6 @@ between organizing, note taking and programming in amazing ways.
 (setf org-block-begin-line t)
 (setf org-export-with-timestamps t)
 (setf org-export-date-timestamp-format "%Y-%m-%d")
-(setcdr (assoc-string "\\.pdf\\'" org-file-apps) "evince %s")
 (setq-default org-tag-alist
               '(("crypt" . ?c)
                 ("drill" . ?d)))
@@ -681,10 +681,8 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 (add-hook 'org-mode-hook 'turn-on-org-cdlatex)
 
 (setf org-latex-create-formula-image-program 'imagemagick)
-(setf org-format-latex-options
-      (plist-put org-format-latex-options :scale 1.6))
 (setf org-latex-listings 'minted)
-(add-to-list 'org-latex-packages-alist '("" "minted"))
+(add-to-list 'org-latex-default-packages-alist '("" "minted"))
 (setf org-latex-minted-options
       '(("frame" "single") ("framesep" "6pt")
         ("mathescape" "true") ("fontsize" "\\footnotesize")))
@@ -703,7 +701,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 *** Managing source code with Org Babel
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org-plus-contrib)
+(ensure-packages 'org-plus-contrib 'gnuplot)
 (setf org-edit-src-content-indentation 0)
 (org-babel-do-load-languages
  'org-babel-load-languages
@@ -754,7 +752,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 (ensure-packages 'ox-reveal)
 (setq
  org-reveal-root
- "file:///home/marco/.emacs.d/elpa/ox-reveal-2015022.2306/reveal.js")
+ "file:///home/marco/userdata/proj/reveal.js")
 #+END_SRC
 
 *** Efficient Learning with Org drill
@@ -1027,9 +1025,6 @@ stepper called `macroexpand-point'.
   (setf buffer-read-only t))
 
 (define-key emacs-lisp-mode-map
-  (kbd "C-c m") 'macroexpand-point)
-
-(define-key org-mode-map
   (kbd "C-c m") 'macroexpand-point)
 
 (defun macroexpand-point (arg)

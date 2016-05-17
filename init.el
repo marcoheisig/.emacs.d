@@ -1422,89 +1422,14 @@ background to illustrate the block structure.
             :after #'org-src-fontification--after)
 #+END_SRC
 
-** Key Bindings
-The Evil key bindings are great, but there are some cases where they fall
-short. The first annoyance is the use of the `ESC' key to quit a mode. A
-useful alternative to `ESC' that is fully on a keyboards home row is to use a
-key chord, that is two keys pressed at almost the same time. The most
-convenient key chord is `jk'.
+** Convenience Utilities
+This section contains some commands that help Emacs do "the right thing" in
+a given context.
 
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'key-chord)
-(key-chord-mode 1)
-(setf key-chord-two-keys-delay 0.05)
-(setf key-chord-one-key-delay 0.14)
-
-(key-chord-define global-map
-                  "jk" 'quit-window)
-
-(key-chord-define minibuffer-local-map
-                  "jk" 'minibuffer-keyboard-quit)
-
-(key-chord-define minibuffer-local-ns-map
-                  "jk" 'minibuffer-keyboard-quit)
-
-(key-chord-define minibuffer-local-completion-map
-                  "jk" 'minibuffer-keyboard-quit)
-
-(key-chord-define minibuffer-local-must-match-map
-                  "jk" 'minibuffer-keyboard-quit)
-
-(key-chord-define minibuffer-local-isearch-map
-                  "jk" 'minibuffer-keyboard-quit)
-
-(key-chord-define evil-multiedit-state-map
-                  "jk" 'evil-multiedit-abort)
-
-(key-chord-define evil-multiedit-insert-state-map
-                  "jk" 'evil-multiedit-state)
-
-(key-chord-define evil-visual-state-map
-                  "jk" 'evil-change-to-previous-state)
-
-(key-chord-define evil-insert-state-map
-                  "jk" 'evil-normal-state)
-
-(key-chord-define evil-replace-state-map
-                  "jk" 'evil-normal-state)
-#+END_SRC
-
-The `jk' keystroke can do even more -- when Evil is already in normal mode,
-leave the current buffer somehow.
-
-#+BEGIN_SRC emacs-lisp
-(defun leave-buffer (prefix)
-  (interactive "P")
-  (cond
-   (org-src-mode
-    (org-edit-src-exit))
-   ((eq major-mode 'dired-mode)
-    (when prefix (quit-window t))
-    (dired-up-directory))
-   ((buffer-file-name)
-    (when prefix (quit-window t))
-    (find-file "."))
-   (t
-    (quit-window prefix))))
-
-(key-chord-define evil-normal-state-map "jk" 'leave-buffer)
-#+END_SRC
-
-No bind the key `U' to the awesome Undo-Tree mode, `SPC' to the Ace Jump Word
-command that queries for a character and jumps to a matching word and `C-c o' to
-the `occur' command.
-
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'ace-jump-mode 'undo-tree)
-(define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
-(define-key evil-normal-state-map (kbd "SPC") 'evil-ace-jump-word-mode)
-(define-key evil-normal-state-map (kbd "C-c o") 'occur)
-#+END_SRC
-
-Now a little gem -- `save-if-appropriate'. This function executes a bunch of
-heuristics to determine whether now is a good moment to save the current
-buffer. Actually these heuristics work so good, that one can bind this command
-to the very frequently used `evil-normal-state-entry-hook'.
+The function `save-if-appropriate' executes a bunch of heuristics to
+determine whether now is a good moment to save the current buffer. Actually
+these heuristics work so good, that one can bind this command to the very
+frequently used `evil-normal-state-entry-hook'.
 
 #+BEGIN_SRC emacs-lisp
 (defun save-if-appropriate ()
@@ -1522,6 +1447,64 @@ to the very frequently used `evil-normal-state-entry-hook'.
       (save-buffer))))
 
 (add-hook 'evil-insert-state-exit-hook 'save-if-appropriate)
+#+END_SRC
+
+Another frequent operation is to `leave-somehow', depending on the context.
+
+#+BEGIN_SRC emacs-lisp
+(defun leave-somehow (prefix)
+  (interactive "P")
+  (save-if-appropriate)
+  (let ((buffer (current-buffer)))
+    (cond
+     (org-src-mode (org-edit-src-exit))
+     ((eq major-mode 'dired-mode)
+      (dired-up-directory))
+     ((minibufferp)
+      (minibuffer-keyboard-quit))
+     ((or (not evil-mode)
+          (eq evil-state 'normal))
+      (when (buffer-file-name)
+        (find-file ".")))
+     (evil-mode
+      (case evil-state
+        (multiedit (evil-multiedit-abort))
+        (otherwise (evil-change-to-previous-state)))))
+    (when prefix
+      (kill-buffer buffer))))
+
+(key-chord-define evil-normal-state-map "jk" 'leave-somehow)
+#+END_SRC
+
+** Key Bindings
+The Evil key bindings are great, but there are some cases where they fall
+short. The first annoyance is the use of the `ESC' key to quit a mode. A
+useful alternative to `ESC' that is fully on a keyboards home row is to use a
+key chord, that is two keys pressed at almost the same time. The most
+convenient key chord is `jk'.
+
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'key-chord)
+(key-chord-mode 1)
+(setf key-chord-two-keys-delay 0.05)
+(setf key-chord-one-key-delay 0.14)
+
+(key-chord-define global-map "jk" 'leave-somehow)
+(key-chord-define global-map "df" 'evil-window-next)
+#+END_SRC
+
+The `jk' keystroke can do even more -- when Evil is already in normal mode,
+leave the current buffer somehow.
+
+No bind the key `U' to the awesome Undo-Tree mode, `SPC' to the Ace Jump Word
+command that queries for a character and jumps to a matching word and `C-c o' to
+the `occur' command.
+
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'ace-jump-mode 'undo-tree)
+(define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
+(define-key evil-normal-state-map (kbd "SPC") 'evil-ace-jump-word-mode)
+(define-key evil-normal-state-map (kbd "C-c o") 'occur)
 #+END_SRC
 
 There are still some Emacs modes around that do not play well with Evil mode. It

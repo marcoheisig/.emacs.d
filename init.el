@@ -535,7 +535,7 @@ preferences.
       helm-buffers-fuzzy-matching t)
 
 (helm-autoresize-mode -1)
-(helm-mode -1)
+(helm-mode 1)
 #+END_SRC
 
 ** Regular Expression Building
@@ -1452,24 +1452,30 @@ frequently used `evil-normal-state-entry-hook'.
 Another frequent operation is to `leave-somehow', depending on the context.
 
 #+BEGIN_SRC emacs-lisp
+(defun leave-current-evil-mode ()
+  (when evil-mode
+    (case evil-state
+      (normal nil)
+      (multiedit (evil-multiedit-abort) t)
+      (otherwise (evil-change-to-previous-state) t))))
+
 (defun leave-somehow (prefix)
   (interactive "P")
   (save-if-appropriate)
   (let ((buffer (current-buffer)))
-    (cond
-     (org-src-mode (org-edit-src-exit))
-     ((eq major-mode 'dired-mode)
-      (dired-up-directory))
-     ((minibufferp)
-      (minibuffer-keyboard-quit))
-     ((or (not evil-mode)
-          (eq evil-state 'normal))
-      (when (buffer-file-name)
-        (find-file ".")))
-     (evil-mode
-      (case evil-state
-        (multiedit (evil-multiedit-abort))
-        (otherwise (evil-change-to-previous-state)))))
+    (or
+     (leave-current-evil-mode)
+     (cond
+      ((minibufferp buffer)
+       (minibuffer-keyboard-quit))
+      (org-src-mode
+       (org-edit-src-exit))
+      ((eq major-mode 'dired-mode)
+       (dired-up-directory))
+      ((buffer-file-name) (find-file "."))
+      ((or (not evil-mode)
+           (eq evil-state 'normal))
+       (t (previous-buffer)))))
     (when prefix
       (kill-buffer buffer))))
 

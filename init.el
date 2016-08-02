@@ -582,6 +582,19 @@ Emacs can open images but does not re-scale them to fit to the buffer. The
 (imagex-auto-adjust-mode)
 #+END_SRC
 
+** Handy abbreviations with Abbrev
+General Unicode characters can be inserted via `C-x 8 RET', but this is too
+cumbersome for many use cases. The abbrev mode allows this somewhat quicker
+input method. Remember that the expansion of abbreviations can be canceled
+by typing `C-q' before finishing the word.
+
+#+BEGIN_SRC emacs-lisp
+(define-abbrev-table
+  'global-abbrev-table
+  '(("alpha" "α")
+    ("beta" "β")))
+#+END_SRC
+
 ** Gracefully manage matching Parentheses with Paredit
 Paredit is what separates happy Lisp programmers from those crying about
 superfluous parentheses.
@@ -840,6 +853,7 @@ therefore bound to the key `Z' instead.
   :prefix "dired-convert-"
   :group 'dired)
 
+(makunbound 'dired-convert-extraction-associations)
 (defcustom dired-convert-extraction-associations
   '(("\\.\\(?:gz\\|tgz\\|bz2\\|xz\\|zip\\|rar\\|7z\\)\\'"
      "7z" "x" src)
@@ -854,6 +868,7 @@ therefore bound to the key `Z' instead.
                                (const src)
                                (const dst)))))
 
+(makunbound 'dired-convert-conversion-associations)
 (defcustom dired-convert-conversion-associations
   '(("\\.\\(?:mp3\\|ogg\\|wma\\|flac\\|wav\\|m4a\\)\\'"
      "ffmpeg" "-i" src "-ab" "192K" "-vn" dst)
@@ -861,8 +876,16 @@ therefore bound to the key `Z' instead.
      "ffmpeg" "-i" src "-ab" "192K" dst)
     ("\\.\\(?:png\\|tga\\|bmp\\|jpeg\\|jpg\\|gif\\)\\'"
      "convert" src dst)
+    ("\\.tar.gz\\'"
+     "tar" "czvpf" dst src)
+    ("\\.tar.xz\\'"
+     "tar" "cJvpf" dst src)
+    ("\\.tar.bz2\\'"
+     "tar" "cjvpf" dst src)
     ("\\.\\(?:gz\\|tgz\\|bz2\\|xz\\|zip\\|rar\\|z\\)\\'"
-     "7z" "a" dst src))
+     "7z" "a" dst src)
+    ("\\.tar\\'"
+     "tar" "cpf" dst src))
   "Associations of file patterns to external programs that
 `dired-convert' uses to convert a file to the specified
 extension."
@@ -1475,7 +1498,8 @@ Another frequent operation is to `leave-somehow', depending on the context.
       ((buffer-file-name) (find-file "."))
       ((or (not evil-mode)
            (eq evil-state 'normal))
-       (t (previous-buffer)))))
+       (previous-buffer))
+      (t (previous-buffer))))
     (when prefix
       (kill-buffer buffer))))
 

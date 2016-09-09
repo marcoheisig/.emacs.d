@@ -402,7 +402,7 @@ Unicode battery symbol and the charge percentage to the mode line.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'battery)
-(setf battery-mode-line-format "🔋 %p%%%%")
+(setf battery-mode-line-format "🔋 %p%%")
 (setf battery-update-interval 5)
 (display-battery-mode 1)
 #+END_SRC
@@ -692,6 +692,8 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'cdlatex 'org-plus-contrib 'htmlize)
 (add-hook 'org-mode-hook 'turn-on-org-cdlatex)
+
+(pushnew '("pdf" . "evince %s") org-file-apps)
 
 (setf org-latex-create-formula-image-program 'imagemagick)
 (setf org-latex-listings 'minted)
@@ -1408,14 +1410,52 @@ might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp
 (set-face-attribute 'button nil :inherit 'link)
 #+END_SRC
 
-The package `powerline' and its derivative `spaceline' make the Emacs mode
-line more beautiful.
+Make the Emacs mode line more beautiful.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'spaceline)
-(ensure-features 'spaceline-config)
-(setf powerline-default-separator 'wave)
-(spaceline-spacemacs-theme)
+(ensure-packages 'telephone-line 'zenburn-theme)
+
+(set-face-attribute 'telephone-line-evil-normal nil
+                    :background "#5F3F3F"
+                    :inherit 'default)
+
+(set-face-attribute 'telephone-line-evil-insert nil
+                    :background "#3F5F3F"
+                    :inherit 'default)
+
+(set-face-attribute 'telephone-line-evil-visual nil
+                    :background "#5F5F3F"
+                    :inherit 'default)
+
+(set-face-attribute 'telephone-line-evil-replace nil
+                    :background "#2F2F2F"
+                    :inherit 'default)
+
+(set-face-attribute 'telephone-line-evil-motion nil
+                    :background "#3F3F5F"
+                    :inherit 'default)
+
+(set-face-attribute 'telephone-line-evil-operator nil
+                    :background "#5F3F5F"
+                    :inherit 'default)
+
+(set-face-attribute 'telephone-line-evil-emacs nil
+                    :background "#7F7F3F"
+                    :inherit 'default)
+
+(setf telephone-line-lhs
+        '((evil   . (telephone-line-evil-tag-segment))
+          (accent . (telephone-line-vc-segment
+                     telephone-line-erc-modified-channels-segment
+                     telephone-line-process-segment))
+          (nil    . (telephone-line-minor-mode-segment
+                     telephone-line-buffer-segment))))
+(setf telephone-line-rhs
+        '((nil    . (telephone-line-misc-info-segment))
+          (accent . (telephone-line-major-mode-segment))
+          (evil   . (telephone-line-airline-position-segment))))
+
+(telephone-line-mode 1)
 #+END_SRC
 
 Org mode presents two options for rendering source code blocks. The default
@@ -1571,7 +1611,8 @@ started. The list contains mostly directories.
   (find-file "~/userdata/gaming/*" t)
   (find-file "~/userdata/*" t)
   (find-file "~/userdata/proj/*" t)
-  (find-file "~/userdata/events/*" t))
+  (find-file "~/userdata/events/*" t)
+  (find-file "~/Downloads" t))
 (setf initial-buffer-choice "~/userdata")
 #+END_SRC
 

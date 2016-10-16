@@ -402,7 +402,7 @@ Unicode battery symbol and the charge percentage to the mode line.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'battery)
-(setf battery-mode-line-format "🔋 %p%%")
+(setf battery-mode-line-format "🔋 %p")
 (setf battery-update-interval 5)
 (display-battery-mode 1)
 #+END_SRC
@@ -589,10 +589,23 @@ input method. Remember that the expansion of abbreviations can be canceled
 by typing `C-q' before finishing the word.
 
 #+BEGIN_SRC emacs-lisp
-(define-abbrev-table
-  'global-abbrev-table
-  '(("alpha" "α")
-    ("beta" "β")))
+(ensure-packages 'org-plus-contrib)
+(ensure-features 'org-entities)
+
+(let ((table ()))
+  (mapc
+   (lambda (x)
+     (when (listp x)
+       (let ((name (car x))
+             (utf-8 (nth 6 x)))
+         (when (and (= 1 (length utf-8))
+                    (multibyte-string-p utf-8))
+           (push (list name utf-8) table)))))
+   org-entities)
+  (clear-abbrev-table global-abbrev-table)
+  (define-abbrev-table
+    'global-abbrev-table
+    table))
 #+END_SRC
 
 ** Gracefully manage matching Parentheses with Paredit
@@ -699,14 +712,17 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 (setf org-latex-listings 'minted)
 (add-to-list 'org-latex-default-packages-alist '("" "minted"))
 (setf org-latex-minted-options
-      '(("frame" "single") ("framesep" "6pt")
-        ("mathescape" "true") ("fontsize" "\\footnotesize")))
+      '(("frame" "single")
+        ("framesep" "6pt")
+        ("encoding" "utf8")
+        ("mathescape" "true")
+        ("fontsize" "\\footnotesize")))
 (setq
  org-latex-pdf-process
- '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+ '("xelatex -shell-escape -interaction nonstopmode -output-directory %o %f"
    "bibtex $(basename %b)"
-   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
+   "xelatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+   "xelatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
 (setq
  LaTeX-command-style
  '((""

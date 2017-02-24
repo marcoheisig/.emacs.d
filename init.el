@@ -589,7 +589,7 @@ input method. Remember that the expansion of abbreviations can be canceled
 by typing `C-q' before finishing the word.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org-plus-contrib)
+(ensure-packages 'org)
 (ensure-features 'org-entities)
 
 (let ((table ()))
@@ -627,7 +627,7 @@ between organizing, note taking and programming in amazing ways.
 
 *** Basics
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org-plus-contrib)
+(ensure-packages 'org)
 (require 'org)
 (setf org-export-backends '(ascii html icalendar latex beamer odt))
 (setf org-adapt-indentation nil)
@@ -703,7 +703,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 *** Exporting Org mode buffers
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'cdlatex 'org-plus-contrib 'htmlize)
+(ensure-packages 'cdlatex 'org 'htmlize)
 (add-hook 'org-mode-hook 'turn-on-org-cdlatex)
 
 (pushnew '("pdf" . "evince %s") org-file-apps)
@@ -732,7 +732,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 *** Managing source code with Org Babel
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org-plus-contrib 'gnuplot)
+(ensure-packages 'org 'gnuplot)
 (setf org-edit-src-content-indentation 0)
 (org-babel-do-load-languages
  'org-babel-load-languages
@@ -793,7 +793,7 @@ drill cards, which are nothing more than org sub trees with some meta data and t
 drill session.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org-plus-contrib)
+(ensure-packages 'org)
 (ensure-features 'org-drill)
 ;; prevent drill hints from ruining Latex formulas
 (setf org-drill-hint-separator "||HINT||")
@@ -1163,9 +1163,13 @@ Proof General is an Emacs front end for various Theorem Provers.
 #+BEGIN_SRC emacs-lisp
 (load-file "~/.emacs.d/elisp/ProofGeneral-4.2/generic/proof-site.el")
 
-;; show-paren-mode does not interact well with the Proof General
-(add-hook 'proof-ready-for-assistant-hook
-          (lambda () (show-paren-mode 0)))
+(defun conditionally-enable-paredit-mode ()
+  (if (derived-mode-p 'proof-mode)
+      (show-paren-mode 0)
+     (show-paren-mode 1)))
+
+(add-hook 'buffer-list-update-hook
+          'conditionally-enable-paredit-mode)
 #+END_SRC
 
 ** EAP - Music Without Jolts
@@ -1210,7 +1214,7 @@ Emacs variable and function, respectively.
 (setf ring-bell-function (lambda ())) ; AKA do nothing
 (prefer-coding-system 'utf-8)
 (setf save-abbrevs nil)
-(setf browse-url-browser-function 'browse-url-chromium)
+(setf browse-url-browser-function 'browse-url-firefox)
 (column-number-mode 1)
 (setf echo-keystrokes 0.01)
 (setq-default fill-column 75)
@@ -1313,7 +1317,7 @@ code derives sane values for such faces automatically. As a result, one can
 load any color theme and get a consistent experience.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'rainbow-delimiters 'org-plus-contrib 'dired+)
+(ensure-packages 'rainbow-delimiters 'org 'dired+)
 
 (defun derive-faces (&rest args)
   (cl-labels
@@ -1503,24 +1507,23 @@ Another frequent operation is to `leave-somehow', depending on the context.
   (interactive "P")
   (save-if-appropriate)
   (let ((buffer (current-buffer)))
-    (or
-     (leave-current-evil-mode)
-     (cond
-      ((minibufferp buffer)
-       (minibuffer-keyboard-quit))
-      (org-src-mode
-       (org-edit-src-exit))
-      ((eq major-mode 'dired-mode)
-       (dired-up-directory))
-      ((buffer-file-name) (find-file "."))
-      ((or (not evil-mode)
-           (eq evil-state 'normal))
-       (previous-buffer))
-      (t (previous-buffer))))
+    (cond
+     ((eq major-mode 'Info-mode)
+      (Info-up))
+     ((leave-current-evil-mode))
+     ((minibufferp buffer)
+      (minibuffer-keyboard-quit))
+     (org-src-mode
+      (org-edit-src-exit))
+     ((eq major-mode 'dired-mode)
+      (dired-up-directory))
+     ((buffer-file-name) (find-file "."))
+     ((or (not evil-mode)
+          (eq evil-state 'normal))
+      (previous-buffer))
+     (t (previous-buffer)))
     (when prefix
       (kill-buffer buffer))))
-
-(key-chord-define evil-normal-state-map "jk" 'leave-somehow)
 #+END_SRC
 
 ** Key Bindings
@@ -1536,8 +1539,10 @@ convenient key chord is `jk'.
 (setf key-chord-two-keys-delay 0.05)
 (setf key-chord-one-key-delay 0.14)
 
-(key-chord-define global-map "jk" 'leave-somehow)
-(key-chord-define global-map "df" 'evil-window-next)
+(key-chord-define global-map            "nr" 'leave-somehow)
+(key-chord-define evil-normal-state-map "nr" 'leave-somehow)
+(key-chord-define global-map            "ae" 'evil-window-next)
+(key-chord-define evil-normal-state-map "ae" 'evil-window-next)
 #+END_SRC
 
 The `jk' keystroke can do even more -- when Evil is already in normal mode,
@@ -1565,7 +1570,6 @@ would be more convenient if every mode would follow the following rules:
 Now come some humble attempts to make Emacs even more evil.
 
 #+BEGIN_SRC emacs-lisp
-(key-chord-define Info-mode-map "jk" 'Info-up)
 (define-key Info-mode-map "n" 'evil-search-next)
 (define-key Info-mode-map "N" 'evil-search-previous)
 (define-key Info-mode-map "b" 'Info-history-back)
@@ -1625,9 +1629,6 @@ Probably also some other Evil features could be added in SLIME
 *** TODO configure and use doc-view mode
 Probably impossible to make doc-view mode as good as evince, but worth a
 try. Maybe I should wait for Emacs Xwidgets support...
-*** TODO proofgeneral and show-paren
-For magic reasons, it is not possible to activate show-paren-mode in
-proofgeneral.
 *** TODO enable company in more modes
 There are many modes that would profit from company completion and do not
 at the moment.
@@ -1636,6 +1637,5 @@ Probably it would be useful to re-enable auto-save in some way
 *** TODO borrow spacemacs config
 Especially the major mode setup and helm
 *** TODO whitespace mode not enabled everywhere
-*** TODO add dedicated command `jk-magic'
 *** TODO set up and use Gnus
 *** TODO apply org-drill bug fix

@@ -374,14 +374,14 @@ section describes how to set it up.
 unconditionally."
   (evil-motion-state 1))
 
-(setf evil-emacs-state-tag " Ⓔ ")
-(setf evil-normal-state-tag " Ⓝ ")
-(setf evil-insert-state-tag " Ⓘ ")
-(setf evil-motion-state-tag " Ⓜ ")
-(setf evil-multiedit-insert-state-tag " ∀Ⓘ ")
-(setf evil-multiedit-state-tag " ∀Ⓝ ")
-(setf evil-operator-state-tag " Ⓞ ")
-(setf evil-visual-state-tag " Ⓥ ")
+(setf evil-emacs-state-tag " E")
+(setf evil-normal-state-tag " N")
+(setf evil-insert-state-tag " I")
+(setf evil-motion-state-tag " M")
+(setf evil-multiedit-insert-state-tag "∀I")
+(setf evil-multiedit-state-tag "∀N")
+(setf evil-operator-state-tag " O")
+(setf evil-visual-state-tag " V")
 (evil-mode 1)
 #+END_SRC
 
@@ -546,7 +546,7 @@ with multiple grouping constructs.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-features 're-builder)
-(setf reb-re-syntax 'read)
+(setf reb-re-syntax 'string)
 #+END_SRC
 
 ** Bibliographic References with Reftex
@@ -1496,13 +1496,6 @@ frequently used `evil-normal-state-entry-hook'.
 Another frequent operation is to `leave-somehow', depending on the context.
 
 #+BEGIN_SRC emacs-lisp
-(defun leave-current-evil-mode ()
-  (when evil-mode
-    (case evil-state
-      (normal nil)
-      (multiedit (evil-multiedit-abort) t)
-      (otherwise (evil-change-to-previous-state) t))))
-
 (defun leave-somehow (prefix)
   (interactive "P")
   (save-if-appropriate)
@@ -1510,7 +1503,14 @@ Another frequent operation is to `leave-somehow', depending on the context.
     (cond
      ((eq major-mode 'Info-mode)
       (Info-up))
-     ((leave-current-evil-mode))
+     ((eq major-mode 'help-mode)
+      (quit-window))
+     ((eq major-mode 'wdired-mode)
+      (wdired-finish-edit))
+     ((not (eq evil-state 'normal))
+      (case evil-state
+        (multiedit (evil-multiedit-abort))
+        (otherwise (evil-change-to-previous-state))))
      ((minibufferp buffer)
       (minibuffer-keyboard-quit))
      (org-src-mode
@@ -1518,10 +1518,8 @@ Another frequent operation is to `leave-somehow', depending on the context.
      ((eq major-mode 'dired-mode)
       (dired-up-directory))
      ((buffer-file-name) (find-file "."))
-     ((or (not evil-mode)
-          (eq evil-state 'normal))
-      (previous-buffer))
-     (t (previous-buffer)))
+     (t
+      (previous-buffer)))
     (when prefix
       (kill-buffer buffer))))
 #+END_SRC
@@ -1577,6 +1575,7 @@ Now come some humble attempts to make Emacs even more evil.
 
 (define-key dired-mode-map "n" 'evil-search-next)
 (define-key dired-mode-map "N" 'evil-search-previous)
+(define-key dired-mode-map "i" 'wdired-change-to-wdired-mode)
 
 (add-hook 'help-mode-hook 'enable-evil-motion-state)
 (add-hook 'package-menu-mode-hook 'enable-evil-motion-state)
@@ -1624,6 +1623,10 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
 
 * Possible Improvements
 A list of things that could be improved in this Emacs configuration
+*** TODO Reorder Evil Keybindings
+- no macro character Q anymore
+- more move keys, e.g. ilea and nrtd
+- use Greek letters in normal mode
 *** TODO The `M-.' is shadowed by `evil-repeat-pop-next', but should jump to a Lisp definition.
 Probably also some other Evil features could be added in SLIME
 *** TODO configure and use doc-view mode

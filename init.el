@@ -431,7 +431,7 @@ the completions include defined functions and variables.
 (defun enable-company-mode ()
   (company-mode 1))
 
-(add-hook 'lisp-mode-hook 'enable-company-mode)
+(add-hook 'prog-mode-hook 'enable-company-mode)
 
 (defun indent-or-complete ()
   (interactive)
@@ -1107,7 +1107,6 @@ With a prefix argument, perform `macroexpand-all' instead."
                  'rainbow-mode 'rainbow-delimiters)
 (add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
 (add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
-(add-hook 'emacs-lisp-mode-hook 'enable-company-mode)
 (add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
 (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
 #+END_SRC
@@ -1133,13 +1132,12 @@ With a prefix argument, perform `macroexpand-all' instead."
 ** Scheme Programming
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'geiser 'paredit 'evil-paredit
-                 'company 'rainbow-delimiters)
+                 'rainbow-delimiters)
 (setf geiser-default-implementation "guile")
 (setf scheme-program-name "guile")
 (add-to-list 'auto-mode-alist `("\\.sc\\'". scheme-mode))
 (add-hook 'scheme-mode-hook 'enable-paredit-mode)
 (add-hook 'scheme-mode-hook 'enable-evil-paredit-mode)
-(add-hook 'scheme-mode-hook 'enable-company-mode)
 (add-hook 'scheme-mode-hook 'rainbow-delimiters-mode)
 #+END_SRC
 
@@ -1288,7 +1286,7 @@ white space.
 
 #+BEGIN_SRC emacs-lisp
 (setf whitespace-style '(face trailing tab-mark))
-(global-whitespace-mode)
+(global-whitespace-mode 1)
 #+END_SRC
 
 Another thing that has probably scared away thousands of potential Emacs
@@ -1639,6 +1637,5 @@ at the moment.
 Probably it would be useful to re-enable auto-save in some way
 *** TODO borrow spacemacs config
 Especially the major mode setup and helm
-*** TODO whitespace mode not enabled everywhere
 *** TODO set up and use Gnus
 *** TODO apply org-drill bug fix

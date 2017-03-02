@@ -12,13 +12,14 @@ snippets.
 This file is divided into several chapters. The first chapter, [[*Meta Configuration][Meta
 Configuration]], describes how the configuration itself is loaded and how
 missing functionality is obtained with the Emacs package manager. The
-chapter [[*Minor Modes][Minor Modes]] enables and configures a plethora of secondary features
-for an amazing Emacs experience. The third chapter [[*Major Modes][Major Modes]] contains
-configuration sorted by the buffer type it applies to, like the `c-mode'
-for operating on files in the C Language. Most human computer interaction
-is placed separately in the chapter [[*User%20Interface][User Interface]]. Prominent features of
-this chapter are color themes, key bindings, undo and redo, auto completion
-and the choice of initial open buffers.
+chapter [[*Minor Modes and Miscellaneous Utilities][Minor Modes and Miscellaneous Utilities]] enables and configures a
+plethora of secondary features for an amazing Emacs experience. The third
+chapter [[*Major Modes][Major Modes]] contains configuration sorted by the buffer type it
+applies to, like the `c-mode' for operating on files in the C
+Language. Most human computer interaction is placed separately in the
+chapter [[*User%20Interface][User Interface]]. Prominent features of this chapter are color
+themes, key bindings, undo and redo, auto completion and the choice of
+initial open buffers.
 
 A word of warning -- this configuration file is heavily centered around the
 [[https://www.emacswiki.org/emacs/Evil][Evil mode]]. Seasoned Emacs users might be surprised by the Vi-style
@@ -325,7 +326,7 @@ information is stored in another independent file.
 (package-initialize)
 #+END_SRC
 
-* Minor Modes
+* Minor Modes and Miscellaneous Utilities
 [[info:Emacs#Minor%20Modes][Minor Modes]] add a variety of secondary features to currently edited
 buffers. Any number of minor modes can be active at a time.
 ** Undo Tree Mode
@@ -337,9 +338,10 @@ showing the true nature of the undo history as a tree with suitable
 navigation commands.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'undo-tree)
+(ensure-packages 'undo-tree 'evil)
 (setf undo-tree-visualizer-timestamps t)
 (setf undo-tree-visualizer-diff t)
+(define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
 #+END_SRC
 
 ** Flyspell
@@ -383,6 +385,9 @@ unconditionally."
 (setf evil-operator-state-tag " O")
 (setf evil-visual-state-tag " V")
 (evil-mode 1)
+
+(add-hook 'help-mode-hook 'enable-evil-motion-state)
+(add-hook 'package-menu-mode-hook 'enable-evil-motion-state)
 #+END_SRC
 
 ** Recording Emacs sessions with Camcorder
@@ -616,6 +621,14 @@ superfluous parentheses.
 (ensure-packages 'paredit 'evil-paredit)
 (defun enable-evil-paredit-mode ()
   (evil-paredit-mode 1))
+#+END_SRC
+
+** Key Chord Mode
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'key-chord)
+(key-chord-mode 1)
+(setf key-chord-two-keys-delay 0.05)
+(setf key-chord-one-key-delay 0.14)
 #+END_SRC
 
 * Major Modes
@@ -1523,47 +1536,42 @@ Another frequent operation is to `leave-somehow', depending on the context.
 #+END_SRC
 
 ** Key Bindings
-The Evil key bindings are great, but there are some cases where they fall
-short. The first annoyance is the use of the `ESC' key to quit a mode. A
-useful alternative to `ESC' that is fully on a keyboards home row is to use a
-key chord, that is two keys pressed at almost the same time. The most
-convenient key chord is `jk'.
+There are different types of key bindings. Most of them are related to the
+name of the underlying function, e.g. `C-x v' for version control, or the
+key `b' for buffer related activities. But there are also bindings that
+depend only on the physical position of the keys on the keyboard. This is
+the case for vim-style motion keys and some key chords. However a single
+keyboard can be used with different layouts, like QWERTY or the German Neo
+layout. This configuration permits to select different positional bindings
+to accommodate for different keyboard layouts.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'key-chord)
-(key-chord-mode 1)
-(setf key-chord-two-keys-delay 0.05)
-(setf key-chord-one-key-delay 0.14)
+(ensure-packages 'key-chord 'evil)
 
-(key-chord-define global-map            "nr" 'leave-somehow)
-(key-chord-define evil-normal-state-map "nr" 'leave-somehow)
-(key-chord-define global-map            "ae" 'evil-window-next)
-(key-chord-define evil-normal-state-map "ae" 'evil-window-next)
+(defvar qwerty-mode-map
+  (let ((map (make-sparse-keymap)))
+    (prog1 map
+      (key-chord-define map "df" 'evil-window-next)
+      (key-chord-define map "jk" 'leave-somehow))))
+
+(defvar neo-mode-map
+  (let ((map (make-sparse-keymap)))
+    (prog1 map
+      (key-chord-define map "ae" 'evil-window-next)
+      (key-chord-define map "nr" 'leave-somehow))))
+
+(define-minor-mode qwerty-mode
+  "Enable QWERY specific key chords."
+  :global t
+  (when qwerty-mode (neo-mode -1)))
+
+(define-minor-mode neo-mode
+  "Enable Neo specific key chords."
+  :global t
+  (when neo-mode (qwerty-mode -1)))
+
+(qwerty-mode 1)
 #+END_SRC
-
-The `jk' keystroke can do even more -- when Evil is already in normal mode,
-leave the current buffer somehow.
-
-No bind the key `U' to the awesome Undo-Tree mode, `SPC' to the Ace Jump Word
-command that queries for a character and jumps to a matching word and `C-c o' to
-the `occur' command.
-
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'ace-jump-mode 'undo-tree)
-(define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
-(define-key evil-normal-state-map (kbd "SPC") 'evil-ace-jump-word-mode)
-(define-key evil-normal-state-map (kbd "C-c o") 'occur)
-#+END_SRC
-
-There are still some Emacs modes around that do not play well with Evil mode. It
-would be more convenient if every mode would follow the following rules:
-- The keys `hjkl' move the cursor
-- The key chord `jk' moves upward in some hirarchy or closes a temporary buffer
-- The keys `/', `n' and `N' can be used for searching
-- The keys `b', `B', `w', `W', `e', `E', `t' and `T' produce some meaningful
-  forward and backward motion.
-
-Now come some humble attempts to make Emacs even more evil.
 
 #+BEGIN_SRC emacs-lisp
 (define-key Info-mode-map "n" 'evil-search-next)
@@ -1574,9 +1582,6 @@ Now come some humble attempts to make Emacs even more evil.
 (define-key dired-mode-map "n" 'evil-search-next)
 (define-key dired-mode-map "N" 'evil-search-previous)
 (define-key dired-mode-map "i" 'wdired-change-to-wdired-mode)
-
-(add-hook 'help-mode-hook 'enable-evil-motion-state)
-(add-hook 'package-menu-mode-hook 'enable-evil-motion-state)
 #+END_SRC
 
 ** Initial Buffers

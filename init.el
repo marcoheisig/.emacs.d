@@ -905,7 +905,7 @@ therefore bound to the key `Z' instead.
      "ffmpeg" "-i" src "-ab" "192K" "-vn" dst)
     ("\\.\\(?:flv\\|mov\\|mp4\\|webm\\|mkv\\)\\'"
      "ffmpeg" "-i" src "-ab" "192K" dst)
-    ("\\.\\(?:png\\|tga\\|bmp\\|jpeg\\|jpg\\|gif\\)\\'"
+    ("\\.\\(?:png\\|tga\\|bmp\\|jpeg\\|jpg\\|gif\\|svg\\)\\'"
      "convert" src dst)
     ("\\.tar.gz\\'"
      "tar" "czvpf" dst src)
@@ -1202,6 +1202,17 @@ Proof General is an Emacs front end for various Theorem Provers.
           'eap-always-kill-buffer-cleanly)
 (add-hook 'kill-buffer-hook
           'eap-always-kill-buffer-cleanly)
+#+END_SRC
+
+** Gnus - More than an Email program
+#+BEGIN_SRC emacs-lisp
+(setq gnus-select-method
+      '(nnimap "FAUMail"
+               (nnimap-address "groupware.fau.de")
+               (nnimap-stream starttls)))
+
+(setq smtpmail-smtp-server "groupware.fau.de"
+      smtpmail-smtp-service 587)
 #+END_SRC
 
 * User Interface

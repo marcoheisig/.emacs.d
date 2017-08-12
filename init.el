@@ -11,7 +11,7 @@ snippets.
 * Introduction
 This file is divided into several chapters. The first chapter, [[*Meta Configuration][Meta
 Configuration]], describes how the configuration itself is loaded and how
-missing functionality is obtained with the Emacs package manager. The
+missing functionality is obtained using the Emacs package manager. The
 chapter [[*Minor Modes and Miscellaneous Utilities][Minor Modes and Miscellaneous Utilities]] enables and configures a
 plethora of secondary features for an amazing Emacs experience. The third
 chapter [[*Major Modes][Major Modes]] contains configuration sorted by the buffer type it
@@ -28,9 +28,8 @@ exhaustion. This is probably a sign of being unworthy, certainly not that
 the default Emacs key bindings are cumbersome.
 
 If you are not Marco Heisig and plan to use this configuration, some lines
-should be adapted accordingly. As a helpful starting point, all lines that
-should definitely be reviewed are those containing `Marco', `Heisig',
-`phone' or `crypt-key'.
+should be adapted accordingly. As a starting point, you should adapt all lines
+containing `Marco', `Heisig', `phone' or `crypt-key'.
 
 A final remark -- this configuration is not optimized for load time. It is
 therefore strongly recommended to use Emacs as a server, which is as simple
@@ -49,7 +48,7 @@ chapters.
 These are magic incantations that make this file also a valid Emacs
 `init.el' file. They are only interesting for seasoned Emacs Lisp hackers,
 others may skip this section. For those curious how it is possible to
-`load' this file from Emacs, it may be enlightening to inspect it using
+`load' this file from Emacs, it may be enlightening to inspect it in
 `M-x emacs-lisp-mode'.
 
 #+BEGIN_SRC emacs-lisp :eval no :export no :wrap ?"
@@ -386,19 +385,22 @@ unconditionally."
 (setf evil-visual-state-tag " V")
 (evil-mode 1)
 
+;; retain Emacs semantics of M-.
+(define-key evil-normal-state-map (kbd "M-.") (kbd "\\ M-."))
+
 (add-hook 'help-mode-hook 'enable-evil-motion-state)
 (add-hook 'package-menu-mode-hook 'enable-evil-motion-state)
+(add-hook 'occur-mode-hook 'enable-evil-motion-state)
 #+END_SRC
 
 ** Recording Emacs sessions with Camcorder
-Some Emacs features are better explained with a short demonstration video
-than many words. The camcorder package allows to record Emacs sessions in
-many video formats.
+Some Emacs features are best explained with a short demonstration
+video. The camcorder package allows to record Emacs sessions in many video
+formats.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'camcorder)
-(define-key global-map (kbd "<f12>")
-  'camcorder-mode)
+(define-key global-map (kbd "<f12>") 'camcorder-mode)
 #+END_SRC
 
 ** Monitoring the Battery
@@ -437,6 +439,7 @@ the completions include defined functions and variables.
   (company-mode 1))
 
 (add-hook 'prog-mode-hook 'enable-company-mode)
+(add-hook 'org-mode-hook 'enable-company-mode)
 
 (defun indent-or-complete ()
   (interactive)
@@ -573,8 +576,8 @@ with multiple grouping constructs.
             (?t . "\\citet{%l}") ; natbib inline text
             (?i . "\\citep{%l}") ; natbib with parens
             )))))
+
 (add-hook 'org-mode-hook 'org-mode-reftex-setup)
-(add-hook 'org-mode-hook 'visual-line-mode)
 #+END_SRC
 
 ** Image viewing with Emacs
@@ -597,30 +600,36 @@ by typing `C-q' before finishing the word.
 (ensure-packages 'org)
 (ensure-features 'org-entities)
 
-(let ((table ()))
-  (mapc
-   (lambda (x)
-     (when (listp x)
-       (let ((name (car x))
-             (utf-8 (nth 6 x)))
-         (when (and (= 1 (length utf-8))
-                    (multibyte-string-p utf-8))
-           (push (list name utf-8) table)))))
-   org-entities)
-  (clear-abbrev-table global-abbrev-table)
-  (define-abbrev-table
-    'global-abbrev-table
-    table))
+
+
+;; (let ((table ()))
+;;   (mapc
+;;    (lambda (x)
+;;      (when (listp x)
+;;        (let ((name (car x))
+;;              (utf-8 (nth 6 x)))
+;;          (when (and (= 1 (length utf-8))
+;;                     (multibyte-string-p utf-8))
+;;            (push (list name utf-8) table)))))
+;;    org-entities)
+;;   (clear-abbrev-table global-abbrev-table)
+;;   (define-abbrev-table
+;;     'global-abbrev-table
+;;     table))
 #+END_SRC
 
-** Gracefully manage matching Parentheses with Paredit
-Paredit is what separates happy Lisp programmers from those crying about
-superfluous parentheses.
+** Gracefully manage matching Parentheses with Smartparens
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'paredit 'evil-paredit)
-(defun enable-evil-paredit-mode ()
-  (evil-paredit-mode 1))
+(ensure-packages 'smartparens 'evil-smartparens)
+
+(require 'smartparens-config)
+
+(smartparens-global-mode t)
+(show-smartparens-global-mode t)
+
+(add-hook 'smartparens-enabled-hook 'evil-smartparens-mode)
+(add-hook 'prog-mode-hook 'turn-on-smartparens-strict-mode)
 #+END_SRC
 
 ** Key Chord Mode
@@ -844,6 +853,18 @@ surpassed by the Org mode Latex export facility and `cdlatex'.
 (add-hook 'LaTeX-mode-hook 'enable-flyspell-mode)
 #+END_SRC
 
+** EIRC
+#+BEGIN_SRC elisp
+(defun irc ()
+  "Connect to the freenode"
+  (interactive)
+  (erc :server "chat.freenode.net"
+       :port 6667
+       :nick "mheisig"))
+
+(global-set-key "\C-ci"  'irc)
+#+END_SRC
+
 ** Directory Browsing with Dired
 Dired is the directory browser in Emacs. There are numerous little tweaks
 to enhance the dired usability. One of them is simply to activate dired+.
@@ -1027,8 +1048,7 @@ itself a lot.
 #+END_QUOTE
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'slime 'slime-company 'rainbow-delimiters
-                 'evil-paredit 'paredit)
+(ensure-packages 'slime 'slime-company)
 (setf inferior-lisp-program "sbcl")
 (slime-setup
  '(slime-fancy
@@ -1043,27 +1063,12 @@ itself a lot.
 
 (setq
  common-lisp-hyperspec-root
- "file:/home/marco/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
+ "~/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
 (global-set-key "\C-cs" 'slime-selector)
 (global-set-key "\C-ch" 'common-lisp-hyperspec)
 
 (define-key slime-mode-map
   (kbd "C-c m") 'slime-macroexpand-1)
-
-(add-hook 'slime-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'slime-mode-hook 'enable-paredit-mode)
-(add-hook 'slime-mode-hook 'enable-evil-paredit-mode)
-(add-hook 'slime-repl-mode-hook 'enable-paredit-mode)
-
-;; workaround for paredit on the slime REPL
-(defun override-slime-repl-bindings-with-paredit ()
-  (define-key slime-repl-mode-map
-    (read-kbd-macro paredit-backward-delete-key) nil))
-
-(add-hook 'slime-repl-mode-hook
-          'override-slime-repl-bindings-with-paredit)
-
-
 #+END_SRC
 
 ** Emacs Lisp
@@ -1115,13 +1120,6 @@ With a prefix argument, perform `macroexpand-all' instead."
         (let ((temp-buffer-show-hook '(emacs-lisp-macroexpand-mode)))
           (with-output-to-temp-buffer bufname
             (pp expansion)))))))
-
-(ensure-packages 'paredit 'evil-paredit 'company
-                 'rainbow-mode 'rainbow-delimiters)
-(add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
-(add-hook 'emacs-lisp-mode-hook 'enable-evil-paredit-mode)
-(add-hook 'emacs-lisp-mode-hook 'rainbow-mode)
-(add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
 #+END_SRC
 
 ** Maxima
@@ -1144,14 +1142,10 @@ With a prefix argument, perform `macroexpand-all' instead."
 
 ** Scheme Programming
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'geiser 'paredit 'evil-paredit
-                 'rainbow-delimiters)
+(ensure-packages 'geiser)
 (setf geiser-default-implementation "guile")
 (setf scheme-program-name "guile")
 (add-to-list 'auto-mode-alist `("\\.sc\\'". scheme-mode))
-(add-hook 'scheme-mode-hook 'enable-paredit-mode)
-(add-hook 'scheme-mode-hook 'enable-evil-paredit-mode)
-(add-hook 'scheme-mode-hook 'rainbow-delimiters-mode)
 #+END_SRC
 
 ** Octave like languages
@@ -1173,14 +1167,6 @@ with similar syntax as Octave.
 Proof General is an Emacs front end for various Theorem Provers.
 #+BEGIN_SRC emacs-lisp
 (load-file "~/.emacs.d/elisp/ProofGeneral-4.2/generic/proof-site.el")
-
-(defun conditionally-enable-paredit-mode ()
-  (if (derived-mode-p 'proof-mode)
-      (show-paren-mode 0)
-     (show-paren-mode 1)))
-
-(add-hook 'buffer-list-update-hook
-          'conditionally-enable-paredit-mode)
 #+END_SRC
 
 ** EAP - Music Without Jolts
@@ -1286,7 +1272,7 @@ leave them disabled.
 By default, there are two major annoyances in Emacs. First, killing a
 buffer with an attached process asks for confirmation every single
 time. Second, a prompt for interactive confirmation requires the user to type
-`y e s RET' instead of a simple `y'. The next code fixes both these issues.
+`y e s RET' instead of a simple `y'. The next snippet fixes both these issues.
 
 #+BEGIN_SRC emacs-lisp
 (setf kill-buffer-query-functions
@@ -1319,8 +1305,8 @@ hands on a file, it clobbers the directory with a backup file with a
 tilde. This configuration disables auto saving by default. If autosaving is
 activated, it places the files in a temporary directory. There are two
 reasons for turning off auto saving by default: The first one is that if a
-file really matters, one should use a versioning tool like Git and some
-hardware backup solution. The second, more profane one is that the
+file really matters, one should use a versioning tool like Git and a
+hardware backup solution. The second, more mundane one is that the
 org-crypt mode does not work well with auto-save.
 
 #+BEGIN_SRC emacs-lisp
@@ -1437,6 +1423,9 @@ load any color theme and get a consistent experience.
 
 ;; run derive-faces after every usage of `load-theme'
 (advice-add 'load-theme :after #'derive-faces)
+
+(add-hook 'prog-mode-hook 'rainbow-delimiters-mode)
+(add-hook 'prog-mode-hook 'rainbow-mode)
 
 (init.el-epilogue
  (derive-faces))
@@ -1592,7 +1581,11 @@ to accommodate for different keyboard layouts.
 
 (define-key dired-mode-map "n" 'evil-search-next)
 (define-key dired-mode-map "N" 'evil-search-previous)
+(define-key dired-mode-map "a" 'wdired-change-to-wdired-mode)
 (define-key dired-mode-map "i" 'wdired-change-to-wdired-mode)
+
+(define-key global-map (kbd "C-c o") 'occur)
+(define-key global-map (kbd "C-x g") 'magit-status)
 #+END_SRC
 
 ** Initial Buffers
@@ -1618,10 +1611,9 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
 (ensure-packages 'diminish)
 
 (let ((mode-line-bloat
-       '(paredit-mode
-         flyspell-mode
+       '(flyspell-mode
          flyspell-prog-mode
-         evil-paredit-mode
+         smartparens-mode
          global-whitespace-mode
          company-mode
          rainbow-mode
@@ -1629,29 +1621,17 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
          undo-tree-mode
          grab-and-drag-mode
          reftex-mode
+         helm-mode
          org-cdlatex-mode
          org-indent-mode
          eldoc-mode)))
-  (mapc #'diminish mode-line-bloat))
+  (dolist (mode mode-line-bloat)
+    (ignore-errors (diminish mode))))
 #+END_SRC
 
 * Possible Improvements
 A list of things that could be improved in this Emacs configuration
-*** TODO Reorder Evil Keybindings
-- no macro character Q anymore
-- more move keys, e.g. ilea and nrtd
-- use Greek letters in normal mode
-*** TODO The `M-.' is shadowed by `evil-repeat-pop-next', but should jump to a Lisp definition.
-Probably also some other Evil features could be added in SLIME
-*** TODO configure and use doc-view mode
-Probably impossible to make doc-view mode as good as evince, but worth a
-try. Maybe I should wait for Emacs Xwidgets support...
-*** TODO enable company in more modes
-There are many modes that would profit from company completion and do not
-at the moment.
-*** TODO review auto saving
-Probably it would be useful to re-enable auto-save in some way
-*** TODO borrow spacemacs config
-Especially the major mode setup and helm
-*** TODO set up and use Gnus
-*** TODO apply org-drill bug fix
+- set up and use Gnus
+- apply org-drill bug fix
+- integrate home-folder restructuring and Linux package setup directly into
+  this file

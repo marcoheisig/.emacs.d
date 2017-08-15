@@ -600,8 +600,6 @@ by typing `C-q' before finishing the word.
 (ensure-packages 'org)
 (ensure-features 'org-entities)
 
-
-
 ;; (let ((table ()))
 ;;   (mapc
 ;;    (lambda (x)
@@ -803,9 +801,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'ox-reveal)
-(setq
- org-reveal-root
- "file:///home/marco/userdata/proj/reveal.js")
+(setq org-reveal-root "~/userdata/proj/reveal.js")
 #+END_SRC
 
 *** Efficient Learning with Org drill
@@ -1169,27 +1165,6 @@ Proof General is an Emacs front end for various Theorem Provers.
 (load-file "~/.emacs.d/elisp/ProofGeneral-4.2/generic/proof-site.el")
 #+END_SRC
 
-** EAP - Music Without Jolts
-#+BEGIN_SRC emacs-lisp
-(ensure-features 'eap)
-(make-directory "~/.emacs.d/eap-playlists" t)
-(make-directory "~/userdata/music" t)
-
-(setf eap-music-library
-      "~/userdata/music")
-(setf eap-playlist-library
-      "~/.emacs.d/eap-playlists")
-
-(setf eap-volume-mute 0.00)
-
-(setf eap-volume-fade-out-flag nil)
-
-(add-hook 'kill-buffer-hook
-          'eap-always-kill-buffer-cleanly)
-(add-hook 'kill-buffer-hook
-          'eap-always-kill-buffer-cleanly)
-#+END_SRC
-
 ** Gnus - More than an Email program
 #+BEGIN_SRC emacs-lisp
 (setq gnus-select-method
@@ -1199,6 +1174,12 @@ Proof General is an Emacs front end for various Theorem Provers.
 
 (setq smtpmail-smtp-server "groupware.fau.de"
       smtpmail-smtp-service 587)
+#+END_SRC
+
+** Magit
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'magit 'evil-magit)
+(setf evil-magit-state 'motion)
 #+END_SRC
 
 * User Interface
@@ -1231,15 +1212,14 @@ Emacs variable and function, respectively.
 (setq-default major-mode 'org-mode)
 (setf require-final-newline t)
 (setq-default indent-tabs-mode nil)
-(setq-default tab-width 8)
+(setq-default tab-width 4)
 (setf indicate-buffer-boundaries nil)
 (setf fringe-mode 4)
 (setq-default indicate-empty-lines t)
 (setf initial-scratch-message nil)
 (setf pop-up-frames nil)
 (setf inhibit-startup-screen t)
-(advice-add 'display-startup-echo-area-message
-            :override #'ignore)
+(advice-add 'display-startup-echo-area-message :override #'ignore)
 #+END_SRC
 
 Emacs wizards have memorized all their commands and have no need for visual
@@ -1314,6 +1294,15 @@ org-crypt mode does not work well with auto-save.
       auto-save-list-file-prefix "~/.emacs.d/auto-save/save-"
       backup-directory-alist (quote (("." . "~/.emacs.d/saves")))
       backup-inhibited nil)
+#+END_SRC
+
+Emacs supports a ridiculously sophisticated mechanism to figure out where
+to display new buffers. The following setup tries to keep the number of
+open windows small.
+
+#+BEGIN_SRC emacs-lisp
+(setf split-height-threshold 100)
+(setf split-width-threshold 160)
 #+END_SRC
 
 ** Color Theme Enhancements
@@ -1570,7 +1559,12 @@ to accommodate for different keyboard layouts.
   :global t
   (when neo-mode (qwerty-mode -1)))
 
-(qwerty-mode 1)
+(let ((output (or (ignore-errors
+                    (shell-command-to-string "xinput"))
+                  "")))
+  (if (s-contains? "Kinesis" output)
+      (neo-mode 1)
+    (qwerty-mode 1)))
 #+END_SRC
 
 #+BEGIN_SRC emacs-lisp

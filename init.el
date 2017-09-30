@@ -344,23 +344,20 @@ navigation commands.
 #+END_SRC
 
 ** Flyspell
-Flyspell is an Emacs built in feature that checks spelling on the fly.
+Flyspell adds spellchecking to Emacs.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-features 'flyspell)
 
 (setf flyspell-issue-message-flag nil)
 
-(defun enable-flyspell-mode ()
-  (flyspell-mode 1))
-
-(defun disable-flyspell-mode ()
-  (flyspell-mode -1))
+(add-hook 'prog-mode-hook 'flyspell-prog-mode)
+(add-hook 'text-mode-hook 'flyspell-mode)
 #+END_SRC
 
 ** The Evil Mode
-The [[info:evil][Evil Mode]] is the most sophisticated Vi emulation for Emacs, and this
-section describes how to set it up.
+The [[info:evil][Evil Mode]] is the most sophisticated Vi emulation for Emacs. This
+section shows how to set it up.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'evil)
@@ -625,6 +622,13 @@ by typing `C-q' before finishing the word.
 
 (require 'smartparens-config)
 
+(define-key smartparens-mode-map (kbd "C-M-k") 'sp-kill-sexp)
+(define-key smartparens-mode-map (kbd "C-M-w") 'sp-copy-sexp)
+(define-key smartparens-mode-map (kbd "C-<right>") 'sp-forward-slurp-sexp)
+(define-key smartparens-mode-map (kbd "C-<left>") 'sp-forward-barf-sexp)
+(define-key smartparens-mode-map (kbd "C-M-<left>") 'sp-backward-slurp-sexp)
+(define-key smartparens-mode-map (kbd "C-M-<right>") 'sp-backward-barf-sexp)
+
 (smartparens-global-mode t)
 (show-smartparens-global-mode t)
 
@@ -673,7 +677,6 @@ between organizing, note taking and programming in amazing ways.
 (global-set-key "\C-ca" 'org-agenda)
 
 (add-hook 'org-mode-hook 'org-indent-mode)
-(add-hook 'org-mode-hook 'enable-flyspell-mode)
 #+END_SRC
 
 Finally there is this little hack for full fontification of long Org mode
@@ -756,34 +759,6 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'org 'gnuplot)
 (setf org-edit-src-content-indentation 0)
-(org-babel-do-load-languages
- 'org-babel-load-languages
- '((asymptote . t)
-   (awk . t)
-   (calc . t)
-   (C . t)
-   (clojure . t)
-   (css . t)
-   (ditaa . t)
-   (dot . t)
-   (emacs-lisp . t)
-   (gnuplot . t)
-   (haskell . t)
-   (java . t)
-   (js . t)
-   (latex . t)
-   (lisp . t)
-   (lilypond . t)
-   (maxima . t)
-   (ocaml . t)
-   (octave . t)
-   (org . t)
-   (perl . t)
-   (python . t)
-   (ruby . t)
-   (scheme . t)
-   (screen . t)
-   (sh . t)))
 (setf org-src-preserve-indentation nil)
 (setf org-src-tab-acts-natively t)
 (setf org-src-window-setup 'other-window)
@@ -803,9 +778,7 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'ox-reveal)
-(setq
- org-reveal-root
- "file:///home/marco/userdata/proj/reveal.js")
+(setq org-reveal-root "~/userdata/proj/reveal.js")
 #+END_SRC
 
 *** Efficient Learning with Org drill
@@ -815,10 +788,10 @@ drill cards, which are nothing more than org sub trees with some meta data and t
 drill session.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org)
-(ensure-features 'org-drill)
+;(ensure-packages 'org)
+;(ensure-features 'org-drill)
 ;; prevent drill hints from ruining Latex formulas
-(setf org-drill-hint-separator "||HINT||")
+;(setf org-drill-hint-separator "||HINT||")
 #+END_SRC
 
 Below is the helpful bug fix for a org-drill redisplay issue.
@@ -850,7 +823,6 @@ surpassed by the Org mode Latex export facility and `cdlatex'.
 (ensure-features 'latex)
 (setq-default TeX-PDF-mode t)
 (company-auctex-init)
-(add-hook 'LaTeX-mode-hook 'enable-flyspell-mode)
 #+END_SRC
 
 ** EIRC
@@ -1017,10 +989,6 @@ AWK code.
 (setf c-basic-offset 4
       c-hanging-braces-alist (quote set-from-style)
       c-offsets-alist (quote ((innamespace . 0))))
-
-(add-hook 'c-mode-hook 'flyspell-prog-mode)
-(add-hook 'c++-mode-hook 'flyspell-prog-mode)
-(add-hook 'java-mode-hook 'flyspell-prog-mode)
 #+END_SRC
 
 The Language C++ is the first to my knowledge where Emacs stutters with maximal
@@ -1058,17 +1026,31 @@ itself a lot.
    slime-asdf
    slime-fancy-inspector
    slime-company
-   ;;slime-fuzzy
    slime-autodoc))
 
-(setq
- common-lisp-hyperspec-root
- "~/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
+(put 'make-instance 'common-lisp-indent-function 1)
+
+(defun tweak-slime-repl ()
+  (setf tab-always-indent t))
+
+(add-hook 'slime-repl-mode-hook 'tweak-slime-repl)
+
+(add-hook 'slime-repl-mode-hook 'company-mode)
+
+(defun start-slime ()
+  (unless (slime-connected-p)
+    (save-excursion (slime))))
+
+(add-hook 'slime-mode-hook 'start-slime)
+
+(setf common-lisp-hyperspec-root
+      "~/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
 (global-set-key "\C-cs" 'slime-selector)
 (global-set-key "\C-ch" 'common-lisp-hyperspec)
 
 (define-key slime-mode-map
   (kbd "C-c m") 'slime-macroexpand-1)
+
 #+END_SRC
 
 ** Emacs Lisp
@@ -1149,8 +1131,8 @@ With a prefix argument, perform `macroexpand-all' instead."
 #+END_SRC
 
 ** Octave like languages
-There is a whole family of programming tools for applied mathematics, all
-with similar syntax as Octave.
+There is a whole family of programming environments for applied mathematics
+with Octave-like syntax.
 #+BEGIN_SRC emacs-lisp
 (ensure-features 'octave)
 (add-to-list 'auto-mode-alist `("\\.sci\\'". octave-mode))
@@ -1231,7 +1213,7 @@ Emacs variable and function, respectively.
 (setq-default major-mode 'org-mode)
 (setf require-final-newline t)
 (setq-default indent-tabs-mode nil)
-(setq-default tab-width 8)
+(setq-default tab-width 4)
 (setf indicate-buffer-boundaries nil)
 (setf fringe-mode 4)
 (setq-default indicate-empty-lines t)
@@ -1635,3 +1617,5 @@ A list of things that could be improved in this Emacs configuration
 - apply org-drill bug fix
 - integrate home-folder restructuring and Linux package setup directly into
   this file
+- write command 'higitus-figitus' to pack my home folder
+- write command 'sutigif-sutigih' to unpack again

@@ -186,7 +186,7 @@ locates a suitable file containing the matching `provide' form. Those files
 can either be placed manually in the `load-path' variable, or conveniently
 installed with the [[info:Emacs#Package][Emacs package manager]]. The following functions ensure
 the presence of certain packages, features and files. Errors are signaled
-when something cannot be ensured.
+if items cannot be ensured.
 
 #+BEGIN_SRC emacs-lisp
 (cl-flet ((define-error (name message)
@@ -1015,7 +1015,7 @@ itself a lot.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'slime 'slime-company)
-(setf inferior-lisp-program "sbcl")
+(setf inferior-lisp-program "~/usr/bin/ros -Q run")
 (slime-setup
  '(slime-fancy
    slime-sbcl-exts
@@ -1029,25 +1029,25 @@ itself a lot.
 (put 'make-instance 'common-lisp-indent-function 1)
 
 (defun tweak-slime-repl ()
-  (setf tab-always-indent t))
+  (setf tab-always-indent t) ; prevent the annoying default completion
+  (slime-company-maybe-enable)) ; activate a sane completion
 
 (add-hook 'slime-repl-mode-hook 'tweak-slime-repl)
-
-(add-hook 'slime-repl-mode-hook 'company-mode)
 
 (defun start-slime ()
   (unless (slime-connected-p)
     (save-excursion (slime))))
 
+;; start SLIME automatically when visiting a file
 (add-hook 'slime-mode-hook 'start-slime)
 
 (setf common-lisp-hyperspec-root
       "~/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
+
 (global-set-key "\C-cs" 'slime-selector)
 (global-set-key "\C-ch" 'common-lisp-hyperspec)
 
-(define-key slime-mode-map
-  (kbd "C-c m") 'slime-macroexpand-1)
+(define-key slime-mode-map (kbd "C-c m") 'slime-macroexpand-1)
 
 #+END_SRC
 
@@ -1490,6 +1490,7 @@ Another frequent operation is to `leave-somehow', depending on the context.
      ((eq major-mode 'help-mode)
       (quit-window))
      ((eq major-mode 'wdired-mode)
+      (evil-change-to-previous-state)
       (wdired-finish-edit))
      ((not (eq evil-state 'normal))
       (case evil-state

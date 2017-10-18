@@ -16,7 +16,7 @@ chapter [[*Minor Modes and Miscellaneous Utilities][Minor Modes and Miscellaneou
 plethora of secondary features for an amazing Emacs experience. The third
 chapter [[*Major Modes][Major Modes]] contains configuration sorted by the buffer type it
 applies to, like the `c-mode' for operating on files in the C
-Language. Most human computer interaction is placed separately in the
+language. Most human computer interaction is placed separately in the
 chapter [[*User%20Interface][User Interface]]. Prominent features of this chapter are color
 themes, key bindings, undo and redo, auto completion and the choice of
 initial open buffers.
@@ -989,7 +989,7 @@ AWK code.
       c-offsets-alist (quote ((innamespace . 0))))
 #+END_SRC
 
-The Language C++ is the first to my knowledge where Emacs stutters with maximal
+The language C++ is the first to my knowledge where Emacs stutters with maximal
 syntax highlighting. Unfortunately it is not possible to change the ridiculously
 complex syntax of C++ (current standardization efforts are even going in the
 opposite direction), so as an alternative the font lock decoration level is
@@ -1044,11 +1044,22 @@ itself a lot.
 (setf common-lisp-hyperspec-root
       "~/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
 
-(global-set-key "\C-cs" 'slime-selector)
-(global-set-key "\C-ch" 'common-lisp-hyperspec)
+(defun slime-show-compilation-log-if-exciting (notes)
+  (when notes (slime-show-compilation-log notes)))
+
+(setq-default slime-compilation-finished-hook
+              'slime-show-compilation-log-if-exciting)
+
+(global-set-key (kbd "C-c s") 'slime-selector)
+(global-set-key (kbd "C-c h") 'common-lisp-hyperspec)
 
 (define-key slime-mode-map (kbd "C-c m") 'slime-macroexpand-1)
+(define-key slime-mode-map (kbd "C-c i") 'slime-inspect)
+(define-key slime-mode-map (kbd "C-c d") 'slime-disassemble-symbol)
 
+(define-key slime-repl-mode-map (kbd "C-c m") 'slime-macroexpand-1)
+(define-key slime-repl-mode-map (kbd "C-c i") 'slime-inspect)
+(define-key slime-repl-mode-map (kbd "C-c d") 'slime-disassemble-symbol)
 #+END_SRC
 
 ** Emacs Lisp
@@ -1203,6 +1214,7 @@ Emacs variable and function, respectively.
 (setf initial-scratch-message nil)
 (setf pop-up-frames nil)
 (setf inhibit-startup-screen t)
+(setf ispell-dictionary "american")
 (advice-add 'display-startup-echo-area-message :override #'ignore)
 #+END_SRC
 

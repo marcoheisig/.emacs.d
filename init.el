@@ -1,7 +1,7 @@
 " -*- coding: utf-8; no-byte-compile: t; -*-
 #+TITLE: Marco Heisig's Emacs configuration
 #+EMAIL: marco.heisig@fau.de
-#+PROPERTY: header-args:emacs-lisp :results value silent
+#+PROPERTY: header-args:emacs-lisp :results silent
 #+OPTIONS: H:2
 
 This is Marco Heisig's [[http://www.gnu.org/software/emacs/emacs.html][Emacs]] configuration. It is written in a Literal
@@ -824,7 +824,7 @@ surpassed by the Org mode Latex export facility and `cdlatex'.
 #+END_SRC
 
 ** EIRC
-#+BEGIN_SRC elisp
+#+BEGIN_SRC emacs-lisp
 (defun irc ()
   "Connect to the freenode"
   (interactive)
@@ -1299,6 +1299,26 @@ open windows small.
 #+BEGIN_SRC emacs-lisp
 (setf split-height-threshold 100)
 (setf split-width-threshold 160)
+#+END_SRC
+
+** Encryption
+#+BEGIN_SRC emacs-lisp
+(ensure-features 'epa-file)
+(epa-file-enable)
+
+(defun truly-random-letter ()
+  (let ((letters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?"))
+    ;; note: letters has 64 characters, or 6 bits of information
+    (assert (= 64 (length letters)))
+    (elt letters
+         (with-temp-buffer
+           (set-buffer-multibyte nil)
+           (call-process "head" "/dev/urandom" (current-buffer) nil "-c1")
+           (mod (get-byte 1) 64)))))
+
+(defun insert-new-password (length)
+  (interactive "nlength: ")
+  (apply #'string (loop repeat length collect (truly-random-letter))))
 #+END_SRC
 
 ** Color Theme Enhancements

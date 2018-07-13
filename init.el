@@ -502,7 +502,7 @@ preferences.
 (setf openwith-associations
       ;; note: no openwith-opening of .ps files or imaxima misbehaves
       '(("\\.\\(?:dvi\\|pdf\\|ps\\.gz\\|djvu\\)\\'"
-         "evince" (file))
+         "okular" (file))
         ("\\.jar\\'"
          "java -jar" (file))
         ("\\.\\(?:odt\\|fodt\\|uot\\|docx\\|docx\\)\\'"
@@ -677,13 +677,6 @@ between organizing, note taking and programming in amazing ways.
 (add-hook 'org-mode-hook 'org-indent-mode)
 #+END_SRC
 
-Finally there is this little hack for full fontification of long Org mode
-buffers. It is not clear (as of 2016) whether this is still an issue.
-
-#+BEGIN_SRC emacs-lisp
-(setf jit-lock-chunk-size 10000)
-#+END_SRC
-
 *** Organizing with Org Agenda
 
 #+BEGIN_SRC emacs-lisp
@@ -761,6 +754,11 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 (setf org-src-tab-acts-natively t)
 (setf org-src-window-setup 'other-window)
 (setq-default org-export-babel-evaluate 'inline-only)
+
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((gnuplot . t)
+   (sh . t)))
 #+END_SRC
 
 *** Encrypting parts of a buffer with Org Crypt
@@ -821,18 +819,25 @@ surpassed by the Org mode Latex export facility and `cdlatex'.
 (ensure-features 'latex)
 (setq-default TeX-PDF-mode t)
 (company-auctex-init)
+;; Use Okular as the primary PDF viewer
+(setcar (cdr (assoc 'output-pdf TeX-view-program-selection)) "Okular")
+(pushnew '(output-pdf "Okular") TeX-view-program-selection
+         :key #'cadr
+         :test #'string=)
 #+END_SRC
 
 ** EIRC
 #+BEGIN_SRC emacs-lisp
-(defun irc ()
-  "Connect to the freenode"
-  (interactive)
-  (erc :server "chat.freenode.net"
-       :port 6667
-       :nick "mheisig"))
+(setf erc-nick "heisig")
+(setf erc-port 6667)
+(setf erc-server "chat.freenode.net")
 
-(global-set-key "\C-ci"  'irc)
+(erc-colorize-mode 1)
+
+(defun tweak-erc ()
+  nil)
+
+(add-hook 'erc-mode-hook 'tweak-erc)
 #+END_SRC
 
 ** Directory Browsing with Dired
@@ -1015,7 +1020,7 @@ itself a lot.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'slime 'slime-company)
-(setf inferior-lisp-program "~/usr/bin/ros -Q run")
+(setf inferior-lisp-program "sbcl")
 (slime-setup
  '(slime-fancy
    slime-sbcl-exts
@@ -1027,6 +1032,13 @@ itself a lot.
    slime-autodoc))
 
 (put 'make-instance 'common-lisp-indent-function 1)
+(put 'define-package 'common-lisp-indent-function '(4 2))
+(put 'dx-flet 'common-lisp-indent-function
+     '((&whole 4 &rest (&whole 1 4 &lambda &body)) &body))
+(put 'dx-let 'common-lisp-indent-function
+     '((&whole 4 &rest (&whole 1 1 2)) &body))
+(put 'dx-let* 'common-lisp-indent-function
+     '((&whole 4 &rest (&whole 1 1 2)) &body))
 
 (defun tweak-slime-repl ()
   (setf tab-always-indent t) ; prevent the annoying default completion
@@ -1115,8 +1127,14 @@ With a prefix argument, perform `macroexpand-all' instead."
 
 ** Maxima
 #+BEGIN_SRC emacs-lisp
+(add-to-list 'load-path "/usr/share/emacs/site-lisp/maxima/")
 (ensure-features 'maxima)
-(add-to-list 'auto-mode-alist `("\\.mac\\'" . maxima-mode))
+(autoload 'maxima-mode "maxima" "Maxima mode" t)
+(autoload 'imaxima "imaxima" "Frontend for maxima with Image support" t)
+(autoload 'maxima "maxima" "Maxima interaction" t)
+(autoload 'imath-mode "imath" "Imath mode for math formula input" t)
+(setq imaxima-use-maxima-mode-flag t)
+(add-to-list 'auto-mode-alist `("\\.ma[cx]\\'" . maxima-mode))
 
 (ensure-features 'imaxima)
 ;; This is a little bugfix, otherwise imaxima decided the equation color
@@ -1152,12 +1170,6 @@ with Octave-like syntax.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'scala-mode)
 (add-to-list 'auto-mode-alist `("\\.scala\\'". scala-mode))
-#+END_SRC
-
-** Proof General
-Proof General is an Emacs front end for various Theorem Provers.
-#+BEGIN_SRC emacs-lisp
-(load-file "~/.emacs.d/elisp/ProofGeneral-4.2/generic/proof-site.el")
 #+END_SRC
 
 ** Gnus - More than an Email program
@@ -1318,7 +1330,8 @@ open windows small.
 
 (defun insert-new-password (length)
   (interactive "nlength: ")
-  (apply #'string (loop repeat length collect (truly-random-letter))))
+  (insert
+   (apply #'string (loop repeat length collect (truly-random-letter)))))
 #+END_SRC
 
 ** Color Theme Enhancements
@@ -1576,12 +1589,23 @@ to accommodate for different keyboard layouts.
   :global t
   (when neo-mode (qwerty-mode -1)))
 
-(let ((output (or (ignore-errors
-                    (shell-command-to-string "xinput"))
-                  "")))
-  (if (s-contains? "Kinesis" output)
-      (neo-mode 1)
-    (qwerty-mode 1)))
+;;; Use the Neo layout, but only on Kinesis keyboards.
+(defun detect-kinesis-keyboards ()
+  (let ((kinesis-keyboards-p t))
+    (with-temp-buffer
+      (with-demoted-errors "Error running xinput: %S"
+        (call-process "xinput" nil t))
+      (goto-char (point-min))
+      (while (re-search-forward "Kinesis Advantage2 Keyboard.+id=\\([0-9]+\\)" nil t)
+        (let ((id (match-string 1)))
+          (setf kinesis-keyboards-p t)
+          (with-demoted-errors "Error running setxkbmap: %S"
+            (call-process "setxkbmap" nil nil nil "-device" id "de" "neo"))))
+      (if kinesis-keyboards-p
+          (neo-mode 1)
+        (qwerty-mode 1)))))
+
+(detect-kinesis-keyboards)
 #+END_SRC
 
 #+BEGIN_SRC emacs-lisp
@@ -1606,10 +1630,8 @@ started. The list contains mostly directories.
 #+BEGIN_SRC emacs-lisp
 (save-excursion
   (find-file-existing "~/.emacs.d/")
-  (find-file "~/userdata/gaming/*" t)
   (find-file "~/userdata/*" t)
   (find-file "~/userdata/proj/*" t)
-  (find-file "~/userdata/events/*" t)
   (find-file "~/Downloads" t))
 (setf initial-buffer-choice "~/userdata")
 #+END_SRC

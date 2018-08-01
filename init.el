@@ -317,8 +317,7 @@ information is stored in another independent file.
 
 (setf package-archives
       '(("gnu" . "http://elpa.gnu.org/packages/")
-        ("melpa" . "https://melpa.org/packages/")
-        ("org" . "http://orgmode.org/elpa/")))
+        ("melpa" . "https://melpa.org/packages/")))
 
 (update-load-path)
 
@@ -386,6 +385,7 @@ unconditionally."
 (define-key evil-normal-state-map (kbd "M-.") (kbd "\\ M-."))
 
 (add-hook 'help-mode-hook 'enable-evil-motion-state)
+(add-hook 'w3m-mode-hook 'enable-evil-motion-state)
 (add-hook 'package-menu-mode-hook 'enable-evil-motion-state)
 (add-hook 'occur-mode-hook 'enable-evil-motion-state)
 #+END_SRC
@@ -594,9 +594,8 @@ input method. Remember that the expansion of abbreviations can be canceled
 by typing `C-q' before finishing the word.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org)
-(ensure-features 'org-entities)
-
+;;(ensure-packages 'org)
+;;(ensure-features 'org-entities)
 ;; (let ((table ()))
 ;;   (mapc
 ;;    (lambda (x)
@@ -606,11 +605,15 @@ by typing `C-q' before finishing the word.
 ;;          (when (and (= 1 (length utf-8))
 ;;                     (multibyte-string-p utf-8))
 ;;            (push (list name utf-8) table)))))
-;;    org-entities)
-;;   (clear-abbrev-table global-abbrev-table)
-;;   (define-abbrev-table
-;;     'global-abbrev-table
-;;     table))
+;;    org-entities))
+
+(define-abbrev-table 'lisp-mode-abbrev-table
+  '(("alpha" "α")
+    ("beta" "β")))
+
+(set-default 'abbrev-mode t)
+
+(setq save-abbrevs nil)
 #+END_SRC
 
 ** Gracefully manage matching Parentheses with Smartparens
@@ -761,6 +764,10 @@ buffers. It is not clear (as of 2016) whether this is still an issue.
 (setf org-src-tab-acts-natively t)
 (setf org-src-window-setup 'other-window)
 (setq-default org-export-babel-evaluate 'inline-only)
+
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((gnuplot . t)))
 #+END_SRC
 
 *** Encrypting parts of a buffer with Org Crypt
@@ -1015,7 +1022,7 @@ itself a lot.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'slime 'slime-company)
-(setf inferior-lisp-program "~/usr/bin/ros -Q run")
+(setf inferior-lisp-program "sbcl")
 (slime-setup
  '(slime-fancy
    slime-sbcl-exts
@@ -1027,6 +1034,8 @@ itself a lot.
    slime-autodoc))
 
 (put 'make-instance 'common-lisp-indent-function 1)
+(put 'reinitialize-instance 'common-lisp-indent-function 1)
+(put 'define-package 'common-lisp-indent-function 1)
 
 (defun tweak-slime-repl ()
   (setf tab-always-indent t) ; prevent the annoying default completion
@@ -1041,17 +1050,7 @@ itself a lot.
 ;; start SLIME automatically when visiting a file
 (add-hook 'slime-mode-hook 'start-slime)
 
-(setf common-lisp-hyperspec-root
-      "~/userdata/literature/cs/lisp/Common Lisp Hyperspec/")
-
-(defun slime-show-compilation-log-if-exciting (notes)
-  (when notes (slime-show-compilation-log notes)))
-
-(setq-default slime-compilation-finished-hook
-              'slime-show-compilation-log-if-exciting)
-
 (global-set-key (kbd "C-c s") 'slime-selector)
-(global-set-key (kbd "C-c h") 'common-lisp-hyperspec)
 
 (define-key slime-mode-map (kbd "C-c m") 'slime-macroexpand-1)
 (define-key slime-mode-map (kbd "C-c i") 'slime-inspect)
@@ -1060,6 +1059,29 @@ itself a lot.
 (define-key slime-repl-mode-map (kbd "C-c m") 'slime-macroexpand-1)
 (define-key slime-repl-mode-map (kbd "C-c i") 'slime-inspect)
 (define-key slime-repl-mode-map (kbd "C-c d") 'slime-disassemble-symbol)
+#+END_SRC
+
+Furthermore, make the Common Lisp Hyperspec (CLHS) accessible withing Emacs.
+
+#+BEGIN_SRC emacs-lisp
+(ensure-features 'w3m)
+
+(setf w3m-default-display-inline-images t)
+
+(setf common-lisp-hyperspec-root "~/userdata/literature/cs/lisp/CLHS/")
+
+(defun use-w3m (fn &rest args)
+  (let ((browse-url-browser-function 'w3m-browse-url))
+    (apply fn args)))
+
+(advice-add 'common-lisp-hyperspec :around 'use-w3m)
+(advice-add 'common-lisp-hyperspec-lookup-reader-macro :around 'use-w3m)
+(advice-add 'common-lisp-hyperspec-format :around 'use-w3m)
+
+(global-set-key (kbd "C-c h h") 'common-lisp-hyperspec)
+(global-set-key (kbd "C-c h r") 'common-lisp-hyperspec-lookup-reader-macro)
+(global-set-key (kbd "C-c h f") 'common-lisp-hyperspec-format)
+(global-set-key (kbd "C-c h g") 'common-lisp-hyperspec-glossary-term)
 #+END_SRC
 
 ** Emacs Lisp
@@ -1198,7 +1220,6 @@ Emacs variable and function, respectively.
 (setf ring-bell-function (lambda ())) ; AKA do nothing
 (prefer-coding-system 'utf-8)
 (setf save-abbrevs nil)
-(setf browse-url-browser-function 'browse-url-firefox)
 (column-number-mode 1)
 (setf echo-keystrokes 0.01)
 (setq-default fill-column 75)
@@ -1207,7 +1228,7 @@ Emacs variable and function, respectively.
 (setq-default major-mode 'org-mode)
 (setf require-final-newline t)
 (setq-default indent-tabs-mode nil)
-(setq-default tab-width 4)
+(setq-default tab-width 8)
 (setf indicate-buffer-boundaries nil)
 (setf fringe-mode 4)
 (setq-default indicate-empty-lines t)
@@ -1364,8 +1385,7 @@ load any color theme and get a consistent experience.
       (dotimes (i 9)
         (let ((face
                (intern
-                (format "rainbow-delimiters-depth-%d-face"
-                        (+ i 1)))))
+                (format "rainbow-delimiters-depth-%d-face" (+ i 1)))))
           (respec face
                   :foreground
                   (merge-hsl
@@ -1421,8 +1441,8 @@ This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'zenburn-theme)
-(load-theme 'zenburn t)
+(ensure-packages 'anti-zenburn-theme)
+(load-theme 'anti-zenburn t)
 (set-face-attribute 'button nil :inherit 'link)
 #+END_SRC
 

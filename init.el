@@ -400,17 +400,6 @@ formats.
 (define-key global-map (kbd "<f12>") 'camcorder-mode)
 #+END_SRC
 
-** Monitoring the Battery
-Emacs provides a robust battery monitoring facility. This configuration adds a
-Unicode battery symbol and the charge percentage to the mode line.
-
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'battery)
-(setf battery-mode-line-format "🔋 %p")
-(setf battery-update-interval 5)
-(display-battery-mode 1)
-#+END_SRC
-
 ** The Insidious Big Brother Database for Emacs
 BBDB is a great address database written in Emacs Lisp.
 
@@ -631,7 +620,7 @@ by typing `C-q' before finishing the word.
 (define-key smartparens-mode-map (kbd "C-M-<right>") 'sp-backward-barf-sexp)
 
 (smartparens-global-mode t)
-(show-smartparens-global-mode t)
+(show-smartparens-global-mode nil)
 
 (add-hook 'smartparens-enabled-hook 'evil-smartparens-mode)
 (add-hook 'prog-mode-hook 'turn-on-smartparens-strict-mode)
@@ -760,8 +749,7 @@ between organizing, note taking and programming in amazing ways.
 
 (org-babel-do-load-languages
  'org-babel-load-languages
- '((gnuplot . t)
-   (sh . t)))
+ '((gnuplot . t)))
 #+END_SRC
 
 *** Encrypting parts of a buffer with Org Crypt
@@ -834,11 +822,6 @@ surpassed by the Org mode Latex export facility and `cdlatex'.
 (setf erc-nick "heisig")
 (setf erc-port 6667)
 (setf erc-server "chat.freenode.net")
-
-(erc-colorize-mode 1)
-
-(defun tweak-erc ()
-  nil)
 
 (add-hook 'erc-mode-hook 'tweak-erc)
 #+END_SRC
@@ -1459,8 +1442,10 @@ load any color theme and get a consistent experience.
 (add-hook 'prog-mode-hook 'rainbow-delimiters-mode)
 (add-hook 'prog-mode-hook 'rainbow-mode)
 
-(init.el-epilogue
- (derive-faces))
+(defun disable-show-paren-mode ()
+  (show-paren-mode -1))
+
+(add-hook 'rainbow-delimiters-mode-hook 'disable-show-paren-mode)
 #+END_SRC
 
 ** The Color Theme and Mode Line
@@ -1475,9 +1460,9 @@ might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp
 (setf doom-themes-enable-bold nil)
 (setf powerline-default-separator 'wave)
 (set-face-attribute 'button nil :inherit 'link)
+(airline-themes-set-modeline)
 
-
-(defun init.el-load-themes (frame)
+(defun init.el-load-themes ()
   (load-theme 'doom-nord t)
   (doom-themes-org-config)
   (load-theme 'airline-nord t)
@@ -1490,7 +1475,7 @@ might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp
               (lambda (frame)
                 (with-selected-frame frame
                   (init.el-load-themes))))
-  (init.el-load-themes nil))
+  (init.el-load-themes))
 #+END_SRC
 
 Org mode presents two options for rendering source code blocks. The default
@@ -1616,7 +1601,7 @@ to accommodate for different keyboard layouts.
 
 ;;; Use the Neo layout, but only on Kinesis keyboards.
 (defun detect-kinesis-keyboards ()
-  (let ((kinesis-keyboards-p t))
+  (let ((kinesis-keyboards-p nil))
     (with-temp-buffer
       (with-demoted-errors "Error running xinput: %S"
         (call-process "xinput" nil t))

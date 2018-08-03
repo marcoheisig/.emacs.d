@@ -502,7 +502,7 @@ preferences.
 (setf openwith-associations
       ;; note: no openwith-opening of .ps files or imaxima misbehaves
       '(("\\.\\(?:dvi\\|pdf\\|ps\\.gz\\|djvu\\)\\'"
-         "okular" (file))
+         "evince" (file))
         ("\\.jar\\'"
          "java -jar" (file))
         ("\\.\\(?:odt\\|fodt\\|uot\\|docx\\|docx\\)\\'"

@@ -36,7 +36,7 @@ therefore strongly recommended to use Emacs as a server, which is as simple
 as using the following command to launch a session:
 
 #+BEGIN_SRC sh :eval no
-emacsclient -n -c -a ''
+emacsclient -nca ''
 #+END_SRC
 
 * Meta Configuration
@@ -624,6 +624,21 @@ by typing `C-q' before finishing the word.
 
 (add-hook 'smartparens-enabled-hook 'evil-smartparens-mode)
 (add-hook 'prog-mode-hook 'turn-on-smartparens-strict-mode)
+(add-hook 'smartparens-mode-hook 'disable-show-paren-mode)
+
+(setf show-paren-delay 0
+      blink-matching-paren nil
+      show-paren-style 'parenthesis)
+
+(defun enable-show-paren-mode ()
+  (show-paren-mode 1)
+  (show-smartparens-mode 1))
+
+(defun disable-show-paren-mode ()
+  (show-paren-mode -1)
+  (show-smartparens-mode -1))
+
+(add-hook 'rainbow-delimiters-mode-hook 'disable-show-paren-mode)
 #+END_SRC
 
 ** Key Chord Mode
@@ -1270,15 +1285,6 @@ time. Second, a prompt for interactive confirmation requires the user to type
 (defalias 'yes-or-no-p 'y-or-n-p)
 #+END_SRC
 
-Now some customization of the highlighting of matching parentheses.
-
-#+BEGIN_SRC emacs-lisp
-(setf show-paren-delay 0
-      blink-matching-paren nil
-      show-paren-style 'parenthesis)
-(show-paren-mode)
-#+END_SRC
-
 Visually indicate the two major sins in programming: tabs and trailing
 white space.
 
@@ -1441,11 +1447,6 @@ load any color theme and get a consistent experience.
 
 (add-hook 'prog-mode-hook 'rainbow-delimiters-mode)
 (add-hook 'prog-mode-hook 'rainbow-mode)
-
-(defun disable-show-paren-mode ()
-  (show-paren-mode -1))
-
-(add-hook 'rainbow-delimiters-mode-hook 'disable-show-paren-mode)
 #+END_SRC
 
 ** The Color Theme and Mode Line
@@ -1668,6 +1669,7 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
          grab-and-drag-mode
          reftex-mode
          helm-mode
+         helm-company-mode
          org-cdlatex-mode
          org-indent-mode
          eldoc-mode)))

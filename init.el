@@ -360,25 +360,14 @@ section shows how to set it up.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'evil)
-(setf evil-want-C-w-in-emacs-state t)
+
 (setf evil-echo-state nil)
-(setf evil-cjk-emacs-word-boundary t)
-(setf evil-want-C-i-jump nil)
-(setf evil-want-C-w-delete nil)
 
 (defun enable-evil-motion-state ()
   "Useful for major mode hooks to evable evil motion state
 unconditionally."
   (evil-motion-state 1))
 
-(setf evil-emacs-state-tag " E")
-(setf evil-normal-state-tag " N")
-(setf evil-insert-state-tag " I")
-(setf evil-motion-state-tag " M")
-(setf evil-multiedit-insert-state-tag "∀I")
-(setf evil-multiedit-state-tag "∀N")
-(setf evil-operator-state-tag " O")
-(setf evil-visual-state-tag " V")
 (evil-mode 1)
 
 ;; retain Emacs semantics of M-.
@@ -608,7 +597,7 @@ by typing `C-q' before finishing the word.
 ** Gracefully manage matching Parentheses with Smartparens
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'smartparens 'evil-smartparens)
+(ensure-packages 'smartparens)
 
 (require 'smartparens-config)
 
@@ -622,7 +611,6 @@ by typing `C-q' before finishing the word.
 (smartparens-global-mode t)
 (show-smartparens-global-mode nil)
 
-(add-hook 'smartparens-enabled-hook 'evil-smartparens-mode)
 (add-hook 'prog-mode-hook 'turn-on-smartparens-strict-mode)
 (add-hook 'smartparens-mode-hook 'disable-show-paren-mode)
 
@@ -1007,7 +995,7 @@ lowered.
 
 ** Common Lisp
 One of the best programming languages on the planet - and thanks to the
-effort of many great programmers, it is as of 2016 more pleasant to use
+effort of many great programmers, it is as of 2018 more pleasant to use
 than ever. The [[https://www.common-lisp.net][Common Lisp website]] is a good start for all those who want
 to start learning this programming language. Because as Eric S. Raymond put
 it:
@@ -1032,6 +1020,7 @@ itself a lot.
    slime-company
    slime-autodoc))
 
+;; Improve indentation of some forms.
 (put 'make-instance 'common-lisp-indent-function 1)
 (put 'change-class 'common-lisp-indent-function 2)
 (put 'reinitialize-instance 'common-lisp-indent-function 1)
@@ -1203,6 +1192,7 @@ with Octave-like syntax.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'magit 'evil-magit)
 (setf evil-magit-state 'motion)
+(define-key global-map (kbd "C-x g") 'magit-status)
 #+END_SRC
 
 * User Interface
@@ -1442,6 +1432,8 @@ load any color theme and get a consistent experience.
                               1.0 0.5 0.75 string-fg)
                  :weight 'bold)))
 
+(set-face-attribute 'button nil :inherit 'link)
+
 ;; run derive-faces after every usage of `load-theme'
 (advice-add 'load-theme :after #'derive-faces)
 
@@ -1460,16 +1452,13 @@ might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp
 
 (setf doom-themes-enable-bold nil)
 (setf powerline-default-separator 'wave)
-(set-face-attribute 'button nil :inherit 'link)
+
 (airline-themes-set-modeline)
 
 (defun init.el-load-themes ()
   (load-theme 'doom-nord t)
   (doom-themes-org-config)
-  (load-theme 'airline-nord t)
-  (custom-theme-set-faces
-   'airline-nord
-   `(minibuffer-prompt ((t (:foreground nil :background nil :inherit 'default))))))
+  (load-theme 'airline-nord t))
 
 (if (daemonp)
     (add-hook 'after-make-frame-functions
@@ -1619,6 +1608,8 @@ to accommodate for different keyboard layouts.
 (detect-kinesis-keyboards)
 #+END_SRC
 
+Improve evil interaction of several major modes.
+
 #+BEGIN_SRC emacs-lisp
 (define-key Info-mode-map "n" 'evil-search-next)
 (define-key Info-mode-map "N" 'evil-search-previous)
@@ -1627,11 +1618,26 @@ to accommodate for different keyboard layouts.
 
 (define-key dired-mode-map "n" 'evil-search-next)
 (define-key dired-mode-map "N" 'evil-search-previous)
-(define-key dired-mode-map "a" 'wdired-change-to-wdired-mode)
-(define-key dired-mode-map "i" 'wdired-change-to-wdired-mode)
+#+END_SRC
 
-(define-key global-map (kbd "C-c o") 'occur)
-(define-key global-map (kbd "C-x g") 'magit-status)
+Use occur to search one or more buffers.
+
+#+BEGIN_SRC emacs-lisp
+(defun occur-dwim (buffers regexp)
+  (interactive
+   (list
+    (if (eq major-mode 'dired-mode)
+        (let ((files (directory-files-recursively "." (read-regexp "Search files matching: "))))
+          (loop for file in files
+                unless (file-directory-p file)
+                collect (save-window-excursion
+                          (find-file file)
+                          (current-buffer))))
+      (list (current-buffer)))
+    (read-regexp "Collect lines matching regexp: ")))
+  (multi-occur buffers regexp))
+
+(define-key global-map (kbd "C-c o") 'occur-dwim)
 #+END_SRC
 
 ** Initial Buffers

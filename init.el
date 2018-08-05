@@ -613,9 +613,9 @@ by typing `C-q' before finishing the word.
 
 (add-hook 'prog-mode-hook 'turn-on-smartparens-strict-mode)
 
-(setf show-paren-delay 0
-      blink-matching-paren nil
-      show-paren-style 'parenthesis)
+(setf show-paren-delay 0)
+(setf blink-matching-paren nil)
+(setf show-paren-style 'parenthesis)
 #+END_SRC
 
 ** Key Chord Mode
@@ -1422,6 +1422,15 @@ load any color theme and get a consistent experience.
                  :weight 'bold)))
 
 (set-face-attribute 'button nil :inherit 'link)
+
+(respec-face 'show-paren-match
+             :foreground 'unspecified
+             :bold t)
+
+(respec-face 'sp-show-pair-match-face
+             :inherit 'show-paren-match
+             :foreground 'unspecified
+             :background 'unspecified)
 
 ;; run derive-faces after every usage of `load-theme'
 (advice-add 'load-theme :after #'derive-faces)

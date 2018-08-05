@@ -612,21 +612,10 @@ by typing `C-q' before finishing the word.
 (show-smartparens-global-mode nil)
 
 (add-hook 'prog-mode-hook 'turn-on-smartparens-strict-mode)
-(add-hook 'smartparens-mode-hook 'disable-show-paren-mode)
 
 (setf show-paren-delay 0
       blink-matching-paren nil
       show-paren-style 'parenthesis)
-
-(defun enable-show-paren-mode ()
-  (show-paren-mode 1)
-  (show-smartparens-mode 1))
-
-(defun disable-show-paren-mode ()
-  (show-paren-mode -1)
-  (show-smartparens-mode -1))
-
-(add-hook 'rainbow-delimiters-mode-hook 'disable-show-paren-mode)
 #+END_SRC
 
 ** Key Chord Mode
@@ -1451,7 +1440,7 @@ might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp
 (require 'airline-themes) ;; I currently don't use the ELPA version
 
 (setf doom-themes-enable-bold nil)
-(setf powerline-default-separator 'wave)
+(setf powerline-default-separator 'slant)
 
 (airline-themes-set-modeline)
 
@@ -1547,7 +1536,9 @@ Another frequent operation is to `leave-somehow', depending on the context.
       (org-edit-src-exit))
      ((eq major-mode 'dired-mode)
       (dired-up-directory))
-     ((buffer-file-name) (find-file "."))
+     ((or (buffer-file-name)
+          (eq major-mode 'shell-mode))
+      (find-file "."))
      (t
       (previous-buffer)))
     (when prefix

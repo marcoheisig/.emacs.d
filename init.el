@@ -517,7 +517,6 @@ preferences.
       helm-semantic-fuzzy-match t
       helm-buffers-fuzzy-matching t)
 
-(helm-autoresize-mode -1)
 (helm-mode 1)
 #+END_SRC
 
@@ -622,8 +621,14 @@ by typing `C-q' before finishing the word.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'key-chord)
 (key-chord-mode 1)
-(setf key-chord-two-keys-delay 0.05)
+(setf key-chord-two-keys-delay 0.07)
 (setf key-chord-one-key-delay 0.14)
+#+END_SRC
+
+** Bash Completion
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'bash-completion)
+(bash-completion-setup)
 #+END_SRC
 
 * Major Modes
@@ -753,13 +758,6 @@ between organizing, note taking and programming in amazing ways.
 (setf org-crypt-key "05369722")
 #+END_SRC
 
-*** Beautiful Presentations with Org Reveal
-
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'ox-reveal)
-(setq org-reveal-root "~/userdata/proj/reveal.js")
-#+END_SRC
-
 *** Efficient Learning with Org drill
 Org drill is an amazing tool to learn new facts. In a first step, one creates
 drill cards, which are nothing more than org sub trees with some meta data and the
@@ -836,7 +834,7 @@ between adjacent [[info:Emacs#Windows][Emacs windows]].
 #+END_SRC
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'dired+)
+(require 'dired+)
 (global-dired-hide-details-mode 1)
 #+END_SRC
 
@@ -999,6 +997,7 @@ itself a lot.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'slime 'slime-company)
 (setf inferior-lisp-program "sbcl")
+(setf slime-lisp-host "localhost")
 (slime-setup
  '(slime-fancy
    slime-sbcl-exts
@@ -1052,7 +1051,7 @@ Furthermore, make the Common Lisp Hyperspec (CLHS) accessible withing Emacs.
 
 (setf w3m-default-display-inline-images t)
 
-(setf common-lisp-hyperspec-root "~/userdata/literature/cs/lisp/CLHS/")
+(setf common-lisp-hyperspec-root "/home/marcoheisig/userdata/literature/cs/lisp/CLHS/")
 
 (defun use-w3m (fn &rest args)
   (let ((browse-url-browser-function 'w3m-browse-url))
@@ -1328,7 +1327,8 @@ code derives sane values for such faces automatically. As a result, one can
 load any color theme and get a consistent experience.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'rainbow-delimiters 'org 'dired+)
+(ensure-packages 'rainbow-delimiters 'org)
+(require 'dired+)
 
 (defun respec-face (face &rest arguments)
   (when (member face (face-list))
@@ -1425,6 +1425,7 @@ load any color theme and get a consistent experience.
 
 (respec-face 'show-paren-match
              :foreground 'unspecified
+             :background 'unspecified
              :bold t)
 
 (respec-face 'sp-show-pair-match-face

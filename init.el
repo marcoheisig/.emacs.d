@@ -487,7 +487,7 @@ preferences.
          "libreoffice" (file))
         ("\\.xcf\\'"
          "gimp" (file))
-        ("\\.\\(?:mp3\\|wav\\|mp4\\|mpe?g\\|avi\\|flac\\|ogg\\|wma\\|m4a\\|mkv\\)\\'"
+        ("\\.\\(?:mp3\\|wav\\|mp4\\|mpe?g\\|avi\\|flac\\|ogg\\|wma\\|m4a\\|mkv\\|webm\\)\\'"
          "vlc" (file))))
 #+END_SRC
 

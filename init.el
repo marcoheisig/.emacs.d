@@ -632,6 +632,18 @@ by typing `C-q' before finishing the word.
 #+END_SRC
 
 * Major Modes
+** GNU APL
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'gnu-apl-mode)
+
+(defun em-gnu-apl-init ()
+  (setq buffer-face-mode-face 'gnu-apl-default)
+  (buffer-face-mode))
+
+(add-hook 'gnu-apl-interactive-mode-hook 'em-gnu-apl-init)
+(add-hook 'gnu-apl-mode-hook 'em-gnu-apl-init)
+#+END_SRC
+
 ** The Org Mode
 If Emacs is the place a programmer lives when using his computer, the [[info:org][Org mode]]
 is likely to be his living room. At its core it is a mode for writing
@@ -1316,6 +1328,9 @@ open windows small.
   (interactive "nlength: ")
   (insert
    (apply #'string (loop repeat length collect (truly-random-letter)))))
+
+(setenv "SSH_AUTH_SOCK"
+        (remove ?\n (shell-command-to-string "gpgconf --list-dirs agent-ssh-socket")))
 #+END_SRC
 
 ** Color Theme Enhancements
@@ -1450,6 +1465,7 @@ might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp
 (require 'airline-themes) ;; I currently don't use the ELPA version
 
 (setf doom-themes-enable-bold nil)
+(setf airline-shortened-directory-length 20)
 (setf powerline-default-separator 'slant)
 
 (airline-themes-set-modeline)
@@ -1679,6 +1695,7 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
          helm-company-mode
          org-cdlatex-mode
          org-indent-mode
+         slime-autodoc-mode
          eldoc-mode)))
   (dolist (mode mode-line-bloat)
     (ignore-errors (diminish mode))))

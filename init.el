@@ -1544,29 +1544,26 @@ Another frequent operation is to `leave-somehow', depending on the context.
   (interactive "P")
   (save-if-appropriate)
   (let ((buffer (current-buffer)))
-    (cond
-     ((eq major-mode 'Info-mode)
-      (Info-up))
-     ((eq major-mode 'help-mode)
-      (quit-window))
-     ((eq major-mode 'wdired-mode)
-      (evil-change-to-previous-state)
-      (wdired-finish-edit))
-     ((not (eq evil-state 'normal))
-      (case evil-state
-        (multiedit (evil-multiedit-abort))
-        (otherwise (evil-change-to-previous-state))))
-     ((minibufferp buffer)
-      (minibuffer-keyboard-quit))
-     (org-src-mode
-      (org-edit-src-exit))
-     ((eq major-mode 'dired-mode)
-      (dired-up-directory))
-     ((or (buffer-file-name)
-          (eq major-mode 'shell-mode))
-      (find-file "."))
-     (t
-      (previous-buffer)))
+    (case major-mode
+      (Info-mode (Info-up))
+      (help-mode (quit-window))
+      (wdired-mode (evil-change-state 'normal)
+                   (wdired-finish-edit))
+      (shell-mode (evil-change-state 'normal)
+                  (find-file "."))
+      (org-src-mode (org-edit-src-exit))
+      (dired-mode (dired-up-directory))
+      (otherwise
+       (cond ((not (eq evil-state 'normal))
+              (case evil-state
+                (multiedit (evil-multiedit-abort))
+                (otherwise (evil-change-to-previous-state))))
+             ((minibufferp buffer)
+              (minibuffer-keyboard-quit))
+             ((buffer-file-name)
+              (find-file "."))
+             (t
+              (previous-buffer)))))
     (when prefix
       (kill-buffer buffer))))
 #+END_SRC

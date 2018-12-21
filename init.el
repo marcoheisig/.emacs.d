@@ -487,7 +487,7 @@ preferences.
          "libreoffice" (file))
         ("\\.xcf\\'"
          "gimp" (file))
-        ("\\.\\(?:mp3\\|wav\\|mp4\\|mpe?g\\|avi\\|flac\\|ogg\\|wma\\|m4a\\|mkv\\)\\'"
+        ("\\.\\(?:mp3\\|wav\\|mp4\\|mpe?g\\|avi\\|flac\\|ogg\\|wma\\|m4a\\|mkv\\|webm\\)\\'"
          "vlc" (file))))
 #+END_SRC
 
@@ -517,7 +517,6 @@ preferences.
       helm-semantic-fuzzy-match t
       helm-buffers-fuzzy-matching t)
 
-(helm-autoresize-mode -1)
 (helm-mode 1)
 #+END_SRC
 
@@ -622,11 +621,29 @@ by typing `C-q' before finishing the word.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'key-chord)
 (key-chord-mode 1)
-(setf key-chord-two-keys-delay 0.05)
+(setf key-chord-two-keys-delay 0.07)
 (setf key-chord-one-key-delay 0.14)
 #+END_SRC
 
+** Bash Completion
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'bash-completion)
+(bash-completion-setup)
+#+END_SRC
+
 * Major Modes
+** GNU APL
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'gnu-apl-mode)
+
+(defun em-gnu-apl-init ()
+  (setq buffer-face-mode-face 'gnu-apl-default)
+  (buffer-face-mode))
+
+(add-hook 'gnu-apl-interactive-mode-hook 'em-gnu-apl-init)
+(add-hook 'gnu-apl-mode-hook 'em-gnu-apl-init)
+#+END_SRC
+
 ** The Org Mode
 If Emacs is the place a programmer lives when using his computer, the [[info:org][Org mode]]
 is likely to be his living room. At its core it is a mode for writing
@@ -753,13 +770,6 @@ between organizing, note taking and programming in amazing ways.
 (setf org-crypt-key "05369722")
 #+END_SRC
 
-*** Beautiful Presentations with Org Reveal
-
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'ox-reveal)
-(setq org-reveal-root "~/userdata/proj/reveal.js")
-#+END_SRC
-
 *** Efficient Learning with Org drill
 Org drill is an amazing tool to learn new facts. In a first step, one creates
 drill cards, which are nothing more than org sub trees with some meta data and the
@@ -836,7 +846,7 @@ between adjacent [[info:Emacs#Windows][Emacs windows]].
 #+END_SRC
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'dired+)
+(require 'dired+)
 (global-dired-hide-details-mode 1)
 #+END_SRC
 
@@ -1001,7 +1011,8 @@ itself a lot.
 
 (ensure-packages 'slime-company)
 
-(setf inferior-lisp-program "sbcl --dynamic-space-size 32000")
+(setf inferior-lisp-program "sbcl --dynamic-space-size 16000")
+(setf slime-lisp-host "localhost")
 (slime-setup
  '(slime-fancy
    slime-sbcl-exts
@@ -1308,6 +1319,9 @@ open windows small.
   (interactive "nlength: ")
   (insert
    (apply #'string (loop repeat length collect (truly-random-letter)))))
+
+(setenv "SSH_AUTH_SOCK"
+        (remove ?\n (shell-command-to-string "gpgconf --list-dirs agent-ssh-socket")))
 #+END_SRC
 
 ** Color Theme Enhancements
@@ -1319,7 +1333,8 @@ code derives sane values for such faces automatically. As a result, one can
 load any color theme and get a consistent experience.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'rainbow-delimiters 'org 'dired+)
+(ensure-packages 'rainbow-delimiters 'org)
+(require 'dired+)
 
 (defun respec-face (face &rest arguments)
   (when (member face (face-list))
@@ -1416,6 +1431,7 @@ load any color theme and get a consistent experience.
 
 (respec-face 'show-paren-match
              :foreground 'unspecified
+             :background 'unspecified
              :bold t)
 
 (respec-face 'sp-show-pair-match-face
@@ -1440,6 +1456,7 @@ might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp
 (require 'airline-themes) ;; I currently don't use the ELPA version
 
 (setf doom-themes-enable-bold nil)
+(setf airline-shortened-directory-length 20)
 (setf powerline-default-separator 'slant)
 
 (airline-themes-set-modeline)
@@ -1669,6 +1686,7 @@ mention in the [[info:Emacs#Mode%20Line][Mode Line]]. The small package `diminis
          helm-company-mode
          org-cdlatex-mode
          org-indent-mode
+         slime-autodoc-mode
          eldoc-mode)))
   (dolist (mode mode-line-bloat)
     (ignore-errors (diminish mode))))

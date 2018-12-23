@@ -1007,8 +1007,11 @@ itself a lot.
 #+END_QUOTE
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'slime 'slime-company)
-(setf inferior-lisp-program "sbcl")
+(load (expand-file-name "~/quicklisp/slime-helper.el"))
+
+(ensure-packages 'slime-company)
+
+(setf inferior-lisp-program "sbcl --dynamic-space-size 16000")
 (setf slime-lisp-host "localhost")
 (slime-setup
  '(slime-fancy
@@ -1059,19 +1062,7 @@ itself a lot.
 Furthermore, make the Common Lisp Hyperspec (CLHS) accessible withing Emacs.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-features 'w3m)
-
-(setf w3m-default-display-inline-images t)
-
-(setf common-lisp-hyperspec-root "/home/marcoheisig/userdata/literature/cs/lisp/CLHS/")
-
-(defun use-w3m (fn &rest args)
-  (let ((browse-url-browser-function 'w3m-browse-url))
-    (apply fn args)))
-
-(advice-add 'common-lisp-hyperspec :around 'use-w3m)
-(advice-add 'common-lisp-hyperspec-lookup-reader-macro :around 'use-w3m)
-(advice-add 'common-lisp-hyperspec-format :around 'use-w3m)
+(setf common-lisp-hyperspec-root (expand-file-name "~/userdata/literature/cs/lisp/CLHS/"))
 
 (global-set-key (kbd "C-c h h") 'common-lisp-hyperspec)
 (global-set-key (kbd "C-c h r") 'common-lisp-hyperspec-lookup-reader-macro)

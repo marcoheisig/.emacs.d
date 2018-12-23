@@ -1425,22 +1425,19 @@ load any color theme and get a consistent experience.
                  :foreground (merge-hsl
                               0.0 0.5 0.75 default-bg
                               1.0 0.5 0.75 string-fg)
-                 :weight 'bold)))
+                 :weight 'bold)
 
-(set-face-attribute 'button nil :inherit 'link)
+    (set-face-attribute 'button nil :inherit 'link)
 
-(respec-face 'show-paren-match
-             :foreground 'unspecified
-             :background 'unspecified
-             :bold t)
+    (respec-face 'show-paren-match
+                 :foreground 'unspecified
+                 :background 'unspecified
+                 :bold t)
 
-(respec-face 'sp-show-pair-match-face
-             :inherit 'show-paren-match
-             :foreground 'unspecified
-             :background 'unspecified)
-
-;; run derive-faces after every usage of `load-theme'
-(advice-add 'load-theme :after #'derive-faces)
+    (respec-face 'sp-show-pair-match-face
+                 :inherit 'show-paren-match
+                 :foreground 'unspecified
+                 :background 'unspecified)))
 
 (add-hook 'prog-mode-hook 'rainbow-delimiters-mode)
 (add-hook 'prog-mode-hook 'rainbow-mode)
@@ -1464,7 +1461,8 @@ might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp
 (defun init.el-load-themes ()
   (load-theme 'doom-nord t)
   (doom-themes-org-config)
-  (load-theme 'airline-nord t))
+  (load-theme 'airline-nord t)
+  (derive-faces))
 
 (if (daemonp)
     (add-hook 'after-make-frame-functions
@@ -1596,6 +1594,7 @@ to accommodate for different keyboard layouts.
 
 ;;; Use the Neo layout, but only on Kinesis keyboards.
 (defun detect-kinesis-keyboards ()
+  (interactive)
   (let ((kinesis-keyboards-p nil))
     (with-temp-buffer
       (with-demoted-errors "Error running xinput: %S"

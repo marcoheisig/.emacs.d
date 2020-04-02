@@ -480,7 +480,7 @@ preferences.
 (setf openwith-associations
       ;; note: no openwith-opening of .ps files or imaxima misbehaves
       '(("\\.\\(?:dvi\\|pdf\\|ps\\.gz\\|djvu\\)\\'"
-         "evince" (file))
+         "okular" (file))
         ("\\.jar\\'"
          "java -jar" (file))
         ("\\.\\(?:odt\\|fodt\\|uot\\|docx\\|docx\\)\\'"
@@ -571,22 +571,17 @@ input method. Remember that the expansion of abbreviations can be canceled
 by typing `C-q' before finishing the word.
 
 #+BEGIN_SRC emacs-lisp
-;;(ensure-packages 'org)
-;;(ensure-features 'org-entities)
-;; (let ((table ()))
-;;   (mapc
-;;    (lambda (x)
-;;      (when (listp x)
-;;        (let ((name (car x))
-;;              (utf-8 (nth 6 x)))
-;;          (when (and (= 1 (length utf-8))
-;;                     (multibyte-string-p utf-8))
-;;            (push (list name utf-8) table)))))
-;;    org-entities))
+(ensure-packages 'org)
+(ensure-features 'org-entities)
+(require 'cl)
 
-(define-abbrev-table 'lisp-mode-abbrev-table
-  '(("alpha" "α")
-    ("beta" "β")))
+(dolist (entity org-entities)
+  (when (listp entity)
+    (let ((name (car entity))
+          (expansion (nth 6 entity)))
+      (when (and (= 1 (length expansion))
+                 (multibyte-string-p expansion))
+        (define-abbrev global-abbrev-table (concatenate 'string name "ö") expansion)))))
 
 (set-default 'abbrev-mode t)
 
@@ -777,10 +772,10 @@ drill cards, which are nothing more than org sub trees with some meta data and t
 drill session.
 
 #+BEGIN_SRC emacs-lisp
-;(ensure-packages 'org)
-;(ensure-features 'org-drill)
+(ensure-packages 'org)
+(ensure-features 'org-drill)
 ;; prevent drill hints from ruining Latex formulas
-;(setf org-drill-hint-separator "||HINT||")
+(setf org-drill-hint-separator "||HINT||")
 #+END_SRC
 
 Below is the helpful bug fix for a org-drill redisplay issue.
@@ -889,7 +884,7 @@ therefore bound to the key `Z' instead.
      "ffmpeg" "-i" src "-ab" "192K" "-vn" dst)
     ("\\.\\(?:flv\\|mov\\|mp4\\|webm\\|mkv\\)\\'"
      "ffmpeg" "-i" src "-ab" "192K" dst)
-    ("\\.\\(?:png\\|tga\\|bmp\\|jpeg\\|jpg\\|gif\\|svg\\)\\'"
+    ("\\.\\(?:png\\|tga\\|bmp\\|jpeg\\|jpg\\|gif\\|svg\\|pdf\\)\\'"
      "convert" src dst)
     ("\\.tar.gz\\'"
      "tar" "czvpf" dst src)
@@ -1025,6 +1020,7 @@ itself a lot.
 
 ;; Improve indentation of some forms.
 (put 'make-instance 'common-lisp-indent-function 1)
+(put 'make-ast 'common-lisp-indent-function 1)
 (put 'change-class 'common-lisp-indent-function 2)
 (put 'reinitialize-instance 'common-lisp-indent-function 1)
 (put 'define-package 'common-lisp-indent-function 1)
@@ -1181,7 +1177,7 @@ with Octave-like syntax.
 
 ** Magit
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'magit 'evil-magit)
+(ensure-packages 'with-editor 'magit 'evil-magit)
 (setf evil-magit-state 'motion)
 (define-key global-map (kbd "C-x g") 'magit-status)
 #+END_SRC

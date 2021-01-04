@@ -306,6 +306,7 @@ navigation commands.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'undo-tree 'evil)
+(global-undo-tree-mode 1)
 (setf undo-tree-visualizer-timestamps t)
 (setf undo-tree-visualizer-diff t)
 (define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
@@ -807,6 +808,9 @@ between adjacent [[info:Emacs#Windows][Emacs windows]].
       dired-listing-switches "-ahl"
       dired-auto-revert-buffer t
       wdired-allow-to-change-permissions 'advanced)
+
+;; Hide details by default
+(add-hook 'dired-mode-hook 'dired-hide-details-mode)
 #+END_SRC
 
 Dired narrow is a handy tool to filter the files in a dired buffer.
@@ -1382,7 +1386,6 @@ load any color theme and get a consistent experience.
                  :background 'unspecified)))
 
 (add-hook 'prog-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'prog-mode-hook 'rainbow-mode)
 #+END_SRC
 
 ** The Color Theme and Mode Line

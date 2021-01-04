@@ -200,24 +200,13 @@ if items cannot be ensured.
   (define-error 'feature-error "Missing feature(s)"))
 
 (defun ensure-packages (&rest required-packages)
-  (let ((missing-packages
-         (cl-remove-if #'package-installed-p
-                       required-packages)))
-    (when missing-packages
-      (when (string-equal
-             (file-name-nondirectory
-              (buffer-file-name))
-             "init.el")
-        (setf init.el-missing-packages
-              (cl-remove-duplicates
-               (append missing-packages
-                       init.el-missing-packages))))
-      (signal 'package-error missing-packages))
-    (mapc ; most packages need to be also required...
-       (lambda (x)
-         (ignore-errors ; ... some dont, ignore their absence
-           (require x)))
-       required-packages)))
+  (mapc
+     (lambda (package)
+       (straight-use-package package)
+       ;; most packages need to be also required...
+       (ignore-errors ; ... some dont, ignore their absence
+         (require package)))
+       required-packages))
 
 (defun ensure-files (&rest filenames)
   (dolist (filename filenames)
@@ -233,22 +222,6 @@ if items cannot be ensured.
           required-features)))
     (when missing-features
       (signal 'feature-error missing-features))))
-
-(defun install-missing-packages ()
-  "Install all packages that were missing while loading the Emacs
-configuraton. More precisely load all packages in
-`init.el-missing-packages'."
-  (interactive)
-  (if init.el-missing-packages
-    (when (or (not (called-interactively-p 'any))
-              (let ((use-dialog-box nil))
-                (yes-or-no-p
-                 (format "Install missing packages: %s "
-                         init.el-missing-packages))))
-      (package-refresh-contents)
-      (mapc #'package-install
-            init.el-missing-packages))
-    (message "No missing packages need to be installed.")))
 #+END_SRC
 
 ** The Epilogue Hook
@@ -300,28 +273,24 @@ information is stored in another independent file.
 (load custom-file)
 #+END_SRC
 
-** The Emacs Package Manager
+** The Straight Package Manager
+
+Straight is a functional package manager for Emacs.  It elegantly
+solves many of the issues of package.el, MELPA and the like.
 
 #+BEGIN_SRC emacs-lisp
-(make-directory "~/.emacs.d/elisp/" t)
-(make-directory "~/.emacs.d/elpa/" t)
-
-(defun update-load-path ()
-  (save-excursion
-    (let ((default-directory "~/.emacs.d/elpa/"))
-      (normal-top-level-add-to-load-path '("."))
-      (normal-top-level-add-subdirs-to-load-path))
-    (let ((default-directory "~/.emacs.d/elisp/"))
-      (normal-top-level-add-to-load-path '("."))
-      (normal-top-level-add-subdirs-to-load-path))))
-
-(setf package-archives
-      '(("gnu" . "http://elpa.gnu.org/packages/")
-        ("melpa" . "https://melpa.org/packages/")))
-
-(update-load-path)
-
-(package-initialize)
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+      (bootstrap-version 5))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
 #+END_SRC
 
 * Minor Modes and Miscellaneous Utilities
@@ -478,8 +447,7 @@ preferences.
 (ensure-packages 'openwith)
 (openwith-mode)
 (setf openwith-associations
-      ;; note: no openwith-opening of .ps files or imaxima misbehaves
-      '(("\\.\\(?:dvi\\|pdf\\|ps\\.gz\\|djvu\\)\\'"
+      '(("\\.\\(?:dvi\\|pdf\\|ps\\.gz\\|ps\\|djvu\\)\\'"
          "okular" (file))
         ("\\.jar\\'"
          "java -jar" (file))
@@ -573,7 +541,7 @@ by typing `C-q' before finishing the word.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'org)
 (ensure-features 'org-entities)
-(require 'cl)
+(require 'cl-lib)
 
 (dolist (entity org-entities)
   (when (listp entity)
@@ -581,7 +549,7 @@ by typing `C-q' before finishing the word.
           (expansion (nth 6 entity)))
       (when (and (= 1 (length expansion))
                  (multibyte-string-p expansion))
-        (define-abbrev global-abbrev-table (concatenate 'string name "ö") expansion)))))
+        (define-abbrev global-abbrev-table (cl-concatenate 'string name "ö") expansion)))))
 
 (set-default 'abbrev-mode t)
 
@@ -722,7 +690,8 @@ between organizing, note taking and programming in amazing ways.
 
 (setf org-latex-create-formula-image-program 'imagemagick)
 (setf org-latex-listings 'minted)
-(add-to-list 'org-latex-default-packages-alist '("" "minted"))
+(add-to-list 'org-latex-default-packages-alist
+ '("" "minted"))
 (setf org-latex-minted-options
       '(("frame" "single")
         ("framesep" "6pt")
@@ -731,10 +700,10 @@ between organizing, note taking and programming in amazing ways.
         ("fontsize" "\\footnotesize")))
 (setq
  org-latex-pdf-process
- '("xelatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+ '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
    "bibtex $(basename %b)"
-   "xelatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-   "xelatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
+   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
 (setq
  LaTeX-command-style
  '((""
@@ -772,7 +741,7 @@ drill cards, which are nothing more than org sub trees with some meta data and t
 drill session.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org)
+(ensure-packages 'org 'org-drill)
 (ensure-features 'org-drill)
 ;; prevent drill hints from ruining Latex formulas
 (setf org-drill-hint-separator "||HINT||")
@@ -838,11 +807,6 @@ between adjacent [[info:Emacs#Windows][Emacs windows]].
       dired-listing-switches "-ahl"
       dired-auto-revert-buffer t
       wdired-allow-to-change-permissions 'advanced)
-#+END_SRC
-
-#+BEGIN_SRC emacs-lisp
-(require 'dired+)
-(global-dired-hide-details-mode 1)
 #+END_SRC
 
 Dired narrow is a handy tool to filter the files in a dired buffer.
@@ -1006,17 +970,17 @@ itself a lot.
 
 (ensure-packages 'slime-company)
 
-(setf inferior-lisp-program "sbcl --dynamic-space-size 16000")
-(setf slime-lisp-host "localhost")
 (slime-setup
  '(slime-fancy
    slime-sbcl-exts
    slime-cl-indent
    slime-sprof
    slime-asdf
-   slime-fancy-inspector
    slime-company
    slime-autodoc))
+
+(setf inferior-lisp-program "~/usr/bin/sbcl")
+(setf slime-lisp-host "localhost")
 
 ;; Improve indentation of some forms.
 (put 'make-instance 'common-lisp-indent-function 1)
@@ -1053,6 +1017,8 @@ itself a lot.
 (define-key slime-repl-mode-map (kbd "C-c m") 'slime-macroexpand-1)
 (define-key slime-repl-mode-map (kbd "C-c i") 'slime-inspect)
 (define-key slime-repl-mode-map (kbd "C-c d") 'slime-disassemble-symbol)
+
+(define-key global-map (kbd "C-c x") 'slime-eval-defun)
 #+END_SRC
 
 Furthermore, make the Common Lisp Hyperspec (CLHS) accessible withing Emacs.
@@ -1329,8 +1295,9 @@ code derives sane values for such faces automatically. As a result, one can
 load any color theme and get a consistent experience.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'rainbow-delimiters 'org)
-(require 'dired+)
+(ensure-packages 'rainbow-delimiters 'org 'diredfl)
+
+(diredfl-global-mode 1)
 
 (defun respec-face (face &rest arguments)
   (when (member face (face-list))
@@ -1389,27 +1356,6 @@ load any color theme and get a consistent experience.
                       1.0 1.0 1.0 default-fg
                       (+ 0.5 (* i 0.166)) 0.8 0.0 "#ff00ff"))))
 
-    ;; dired+ faces
-    (respec-face 'diredp-compressed-file-suffix :inherit 'font-lock-comment-face)
-    (respec-face 'diredp-file-suffix :inherit 'font-lock-comment-face)
-    (respec-face 'diredp-date-time :inherit 'font-lock-comment-face)
-    (respec-face 'diredp-dir-heading :inherit 'org-block-begin-line)
-    (respec-face 'diredp-dir-name :inherit 'dired-directory)
-    (respec-face 'diredp-symlink :inherit 'font-lock-constant-face)
-    (respec-face 'diredp-file-name :inherit 'default)
-    (respec-face 'diredp-ignored-file-name :inherit 'font-lock-comment-face)
-    (respec-face 'diredp-number :inherit 'font-lock-constant-face)
-    (respec-face 'diredp-flag-mark :inherit 'highlight)
-    (respec-face 'diredp-flag-mark-line :inherit 'highlight)
-    (respec-face 'diredp-deletion :inherit 'warning)
-    (respec-face 'diredp-deletion-file-name :inherit 'warning)
-    (respec-face 'diredp-dir-priv :inherit 'dired-directory)
-    (respec-face 'diredp-read-priv :inherit 'rainbow-delimiters-depth-1-face)
-    (respec-face 'diredp-write-priv :inherit 'rainbow-delimiters-depth-2-face)
-    (respec-face 'diredp-exec-priv :inherit 'rainbow-delimiters-depth-3-face)
-    (respec-face 'diredp-link-priv :inherit 'default)
-    (respec-face 'diredp-rare-priv :inherit 'default)
-
     ;; regexp-grouping constructs should have the same color as the
     ;; `font-lock-string-face', but different emphasis.
     (respec-face 'font-lock-regexp-grouping-backslash
@@ -1444,9 +1390,8 @@ This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'doom-themes 'spaceline)
+(ensure-packages 'airline-themes 'doom-themes 'spaceline)
 (ensure-features 'spaceline-config)
-(require 'airline-themes) ;; I currently don't use the ELPA version
 
 (setf doom-themes-enable-bold nil)
 (setf airline-shortened-directory-length 20)
@@ -1457,7 +1402,7 @@ might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp
 (defun init.el-load-themes ()
   (load-theme 'doom-nord t)
   (doom-themes-org-config)
-  (load-theme 'airline-nord t)
+  (load-theme 'airline-base16_nord t)
   (derive-faces))
 
 (if (daemonp)

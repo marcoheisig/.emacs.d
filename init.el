@@ -306,10 +306,12 @@ navigation commands.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'undo-tree 'evil)
+(evil-set-undo-system 'undo-tree)
 (global-undo-tree-mode 1)
 (setf undo-tree-visualizer-timestamps t)
 (setf undo-tree-visualizer-diff t)
 (define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
+(setq undo-tree-history-directory-alist '(("." . "~/.emacs.d./.cache")))
 #+END_SRC
 
 ** Flyspell
@@ -421,8 +423,8 @@ to mark a word and press `R' to edit all its occurrences at the same time.
 (define-key evil-visual-state-map (kbd "C-M-D")
   'evil-multiedit-restore)
 
-(define-key evil-multiedit-state-map (kbd "RET")
-  'evil-multiedit-toggle-or-restrict-region)
+;(define-key evil-multiedit-state-map (kbd "RET")
+;  'evil-multiedit-toggle-or-restrict-region)
 
 (define-key evil-visual-state-map (kbd "RET")
   'evil-multiedit-toggle-or-restrict-region)
@@ -594,6 +596,13 @@ by typing `C-q' before finishing the word.
 (ensure-packages 'bash-completion)
 (bash-completion-setup)
 #+END_SRC
+** Environment Variables
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'exec-path-from-shell)
+(dolist (var '("SSH_AUTH_SOCK" "SSH_AGENT_PID" "GPG_AGENT_INFO" "LANG" "LC_CTYPE" "PKG_CONFIG_PATH" "LD_LIBRARY_PATH"))
+  (add-to-list 'exec-path-from-shell-variables var))
+(exec-path-from-shell-initialize)
+#+END_SRC
 
 * Major Modes
 ** GNU APL
@@ -618,6 +627,7 @@ between organizing, note taking and programming in amazing ways.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'org)
 (require 'org)
+(require 'ox-md)
 (setf org-export-backends '(ascii html icalendar latex beamer odt))
 (setf org-adapt-indentation nil)
 (setf org-agenda-window-setup (quote current-window))
@@ -687,7 +697,7 @@ between organizing, note taking and programming in amazing ways.
 (ensure-packages 'cdlatex 'org 'htmlize)
 (add-hook 'org-mode-hook 'turn-on-org-cdlatex)
 
-(pushnew '("pdf" . "evince %s") org-file-apps)
+(cl-pushnew '("pdf" . "evince %s") org-file-apps)
 
 (setf org-latex-create-formula-image-program 'imagemagick)
 (setf org-latex-listings 'minted)
@@ -779,7 +789,7 @@ surpassed by the Org mode Latex export facility and `cdlatex'.
 (company-auctex-init)
 ;; Use Okular as the primary PDF viewer
 (setcar (cdr (assoc 'output-pdf TeX-view-program-selection)) "Okular")
-(pushnew '(output-pdf "Okular") TeX-view-program-selection
+(cl-pushnew '(output-pdf "Okular") TeX-view-program-selection
          :key #'cadr
          :test #'string=)
 #+END_SRC
@@ -1003,11 +1013,32 @@ itself a lot.
   (setf tab-always-indent t) ; prevent the annoying default completion
   (slime-company-maybe-enable)) ; activate a sane completion
 
+(defun clouseau-inspect (string)
+  (interactive
+   (list (slime-read-from-minibuffer
+          "Inspect value (evaluated): "
+          (slime-sexp-at-point))))
+  (let ((inspector 'cl-user::*clouseau-inspector*))
+    (slime-eval-async
+        `(cl:progn
+          (cl:defvar ,inspector nil)
+          ;; (Re)start the inspector if necessary.
+          (cl:unless (cl:and (clim:application-frame-p ,inspector)
+                             (clim-internals::frame-process ,inspector))
+                     (cl:setf ,inspector (cl:nth-value 1 (clouseau:inspect nil :new-process t))))
+          ;; Tell the inspector to visualize the correct datum.
+          (cl:setf (clouseau:root-object ,inspector :run-hook-p t)
+                   (cl:eval (cl:read-from-string ,string)))
+          ;; Return nothing.
+          (cl:values)))))
+
+(define-key slime-prefix-map (kbd "i") 'clouseau-inspect)
+
 (add-hook 'slime-repl-mode-hook 'tweak-slime-repl)
 
 (defun start-slime ()
   (unless (slime-connected-p)
-    (save-excursion (slime))))
+    (save-mark-and-excursion (slime))))
 
 ;; start SLIME automatically when visiting a file
 (add-hook 'slime-mode-hook 'start-slime)
@@ -1017,6 +1048,7 @@ itself a lot.
 (define-key slime-mode-map (kbd "C-c m") 'slime-macroexpand-1)
 (define-key slime-mode-map (kbd "C-c i") 'slime-inspect)
 (define-key slime-mode-map (kbd "C-c d") 'slime-disassemble-symbol)
+(define-key slime-mode-map (kbd "C-c ~") 'slime-sync-package-and-default-directory)
 
 (define-key slime-repl-mode-map (kbd "C-c m") 'slime-macroexpand-1)
 (define-key slime-repl-mode-map (kbd "C-c i") 'slime-inspect)
@@ -1150,6 +1182,11 @@ with Octave-like syntax.
 (ensure-packages 'with-editor 'magit 'evil-magit)
 (setf evil-magit-state 'motion)
 (define-key global-map (kbd "C-x g") 'magit-status)
+#+END_SRC
+
+** CUDA
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'cuda-mode)
 #+END_SRC
 
 * User Interface

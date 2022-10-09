@@ -9,21 +9,21 @@ Programming style and the [[http://www.orgmode.org][Org mode]] is used to manage
 snippets.
 
 * Introduction
-This file is divided into several chapters. The first chapter, [[*Meta Configuration][Meta
-Configuration]], describes how the configuration itself is loaded and how
-missing functionality is obtained using the Emacs package manager. The
-chapter [[*Minor Modes and Miscellaneous Utilities][Minor Modes and Miscellaneous Utilities]] enables and configures a
-plethora of secondary features for an amazing Emacs experience. The third
-chapter [[*Major Modes][Major Modes]] contains configuration sorted by the buffer type it
-applies to, like the `c-mode' for operating on files in the C
-language. Most human computer interaction is placed separately in the
-chapter [[*User%20Interface][User Interface]]. Prominent features of this chapter are color
-themes, key bindings, undo and redo, auto completion and the choice of
-initial open buffers.
+This file is divided into several chapters, and the code therein is loaded
+sequentially. The first chapter, [[*Meta Configuration][Meta Configuration]], describes how the
+configuration itself is loaded and how missing functionality is fetched
+from the internet. The chapter [[*Minor Modes and Miscellaneous Utilities][Minor Modes and Miscellaneous Utilities]]
+enables and configures a plethora of secondary features for an amazing
+Emacs experience. The third chapter [[*Major Modes][Major Modes]] contains configuration
+sorted by the buffer type it applies to, like the `c-mode' for operating on
+files in the C language. Most human computer interaction is placed
+separately in the chapter [[*User%20Interface][User Interface]]. Prominent features of this
+chapter are color themes, key bindings, and the choice of initial open
+buffers.
 
 A word of warning -- this configuration file is heavily centered around the
-[[https://www.emacswiki.org/emacs/Evil][Evil mode]]. Seasoned Emacs users might be surprised by the Vi-style
-key bindings. The author had to switch the layout due to pinky finger
+[[https://www.emacswiki.org/emacs/Evil][Evil mode]]. Seasoned Emacs users might be surprised by the Vi-style key
+bindings. The author had to switch the layout due to pinky finger
 exhaustion. This is probably a sign of being unworthy, certainly not that
 the default Emacs key bindings are cumbersome.
 
@@ -52,15 +52,16 @@ others may skip this section. For those curious how it is possible to
 `M-x emacs-lisp-mode'.
 
 #+BEGIN_SRC emacs-lisp :eval no :export no :wrap ?"
-(require 'cl-lib) ;; enable Common Lisp features
+;; Enable various Common Lisp features.
+(require 'cl-lib)
 
 (defvar init.el-errors '()
   "A list of errors that occured during initialization. Each
 error is of the form (MARKER . MESSAGE).")
 
 (defvar init.el-missing-packages '()
-  "A list of packages that were demanded during initialization,
-  but were not installed.")
+  "The list of packages that init.el tried to install, but
+  couldn't, e.g., because there is no internet connection.")
 
 (defvar init.el-missing-features '()
   "A list of features that were demanded during initialization,
@@ -104,7 +105,7 @@ add them to `init.el-errors'."
   "Execute the next emacs-lisp source code block. Return T if a
 block was successfully executed and NIL if no block could be
 found."
-  (let ((block-executed? nil)
+  (let ((block-executed-p nil)
         (buffer (current-buffer))
         (src-regexp ;; copy paste from org mode's ob-core.el
          (concat
@@ -117,7 +118,7 @@ found."
           ;; (5) body
           "\\([^\000]*?\n\\)??[ \t]*#\\+end_src")))
     ;; scan for org babel source code blocks
-    (while (and (not block-executed?)
+    (while (and (not block-executed-p)
                 (re-search-forward src-regexp nil t))
       (let ((lang (match-string-no-properties 2))
             (switches (match-string-no-properties 3))
@@ -141,9 +142,9 @@ found."
                    (set-marker init.el-marker
                                (scan-sexps (point) -1)
                                buffer)))))
-            (setf block-executed? t)))
+            (setf block-executed-p t)))
         (goto-char end-block)))
-    block-executed?))
+    block-executed-p))
 
 (defun init ()
   "Traverse the initialization file and try to execute all its source
@@ -172,7 +173,8 @@ blocks. Any errors that occur are stored in `init.el-errors'."
 
 (init)
 
-;; make `load' skip the rest of this file
+;; Make `load' skip the rest of this file.  Then restore the previous
+;; behavior of LOAD.
 (setf load-read-function
       (lambda (&optional stream)
         (set-buffer stream)
@@ -189,6 +191,7 @@ the presence of certain packages, features and files. Errors are signaled
 if items cannot be ensured.
 
 #+BEGIN_SRC emacs-lisp
+;; Define error signals for missing packages and features. 
 (cl-flet ((define-error (name message)
             (if (fboundp 'define-error)
                 (define-error name message)
@@ -199,29 +202,25 @@ if items cannot be ensured.
   (define-error 'package-error "Missing package(s)")
   (define-error 'feature-error "Missing feature(s)"))
 
-(defun ensure-packages (&rest required-packages)
-  (mapc
-     (lambda (package)
-       (straight-use-package package)
-       ;; most packages need to be also required...
-       (ignore-errors ; ... some dont, ignore their absence
-         (require package)))
-       required-packages))
+(defun ensure-package (package)
+  "Ensure that the designated PACKAGE is installed."
+  (straight-use-package package))
+
+(defun ensure-packages (&rest packages)
+  "Ensure that the designated PACKAGES are installed."
+  (mapc 'ensure-package packages))
+
+(defun ensure-file (filename)
+  "Ensure that FILENAME points to an existing file.  Create
+directories and the file if necessary."
+  (make-directory (file-name-directory filename) t)
+  (unless (file-exists-p filename)
+    (write-region "" nil filename)))
 
 (defun ensure-files (&rest filenames)
-  (dolist (filename filenames)
-    (make-directory (file-name-directory filename) t)
-    (unless (file-exists-p filename)
-      (write-region "" nil filename))))
-
-(defun ensure-features (&rest required-features)
-  (let ((missing-features
-         (cl-remove-if
-          (lambda (x)
-            (require x nil t))
-          required-features)))
-    (when missing-features
-      (signal 'feature-error missing-features))))
+  "Ensure that the supplied FILENAMES point to existing files.  Create
+directories and files if necessary."
+  (mapc 'ensure-file filenames))
 #+END_SRC
 
 ** The Epilogue Hook
@@ -296,34 +295,13 @@ solves many of the issues of package.el, MELPA and the like.
 * Minor Modes and Miscellaneous Utilities
 [[info:Emacs#Minor%20Modes][Minor Modes]] add a variety of secondary features to currently edited
 buffers. Any number of minor modes can be active at a time.
-** Undo Tree Mode
-While the default Emacs undo mechanism never forgets past modifications,
-moving to an old state requires moving through the whole history in
-between. For multiple branches of history, this leads to longer and longer
-undo chains. The undo tree mode brings speed and clarity in this respect by
-showing the true nature of the undo history as a tree with suitable
-navigation commands.
 
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'undo-tree 'evil)
-(evil-set-undo-system 'undo-tree)
-(global-undo-tree-mode 1)
-(setf undo-tree-visualizer-timestamps t)
-(setf undo-tree-visualizer-diff t)
-(define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
-(setq undo-tree-history-directory-alist '(("." . "~/.emacs.d./.cache")))
-#+END_SRC
-
-** Flyspell
+** Flycheck
 Flyspell adds spellchecking to Emacs.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-features 'flyspell)
-
-(setf flyspell-issue-message-flag nil)
-
-(add-hook 'prog-mode-hook 'flyspell-prog-mode)
-(add-hook 'text-mode-hook 'flyspell-mode)
+(ensure-packages 'flycheck)
+(global-flycheck-mode)
 #+END_SRC
 
 ** The Evil Mode
@@ -331,19 +309,25 @@ The [[info:evil][Evil Mode]] is the most sophisticated Vi emulation for Emacs. T
 section shows how to set it up.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'evil)
+(ensure-packages 'undo-tree 'evil 'evil-matchit)
+
+;; Configure the undo tree.
+(global-undo-tree-mode 1)
+(setf undo-tree-visualizer-timestamps t)
+(setf undo-tree-visualizer-diff t)
+
+(setq undo-tree-history-directory-alist '(("." . "~/.emacs.d/.cache")))
 
 (setf evil-echo-state nil)
+(evil-mode 1)
+(define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
+
+;; Retain Emacs semantics of M-.
+(define-key evil-normal-state-map (kbd "M-.") (kbd "\\ M-."))
 
 (defun enable-evil-motion-state ()
-  "Useful for major mode hooks to evable evil motion state
-unconditionally."
+  "Useful for major mode hooks to evable evil motion state unconditionally."
   (evil-motion-state 1))
-
-(evil-mode 1)
-
-;; retain Emacs semantics of M-.
-(define-key evil-normal-state-map (kbd "M-.") (kbd "\\ M-."))
 
 (add-hook 'help-mode-hook 'enable-evil-motion-state)
 (add-hook 'w3m-mode-hook 'enable-evil-motion-state)
@@ -378,7 +362,8 @@ individual words. This is particularly useful in programming modes, where
 the completions include defined functions and variables.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'company)
+(ensure-packages 'company 'company-quickhelp)
+(require 'company)
 (setf company-idle-delay 0.02)
 (setf company-minimum-prefix-length 1)
 
@@ -407,6 +392,8 @@ to mark a word and press `R' to edit all its occurrences at the same time.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'evil-multiedit 'iedit)
+(require 'evil-multiedit)
+
 (define-key evil-visual-state-map "R"
   'evil-multiedit-match-all)
 
@@ -423,19 +410,19 @@ to mark a word and press `R' to edit all its occurrences at the same time.
 (define-key evil-visual-state-map (kbd "C-M-D")
   'evil-multiedit-restore)
 
-;(define-key evil-multiedit-state-map (kbd "RET")
-;  'evil-multiedit-toggle-or-restrict-region)
+(define-key evil-multiedit-mode-map (kbd "RET")
+  'evil-multiedit-toggle-or-restrict-region)
 
 (define-key evil-visual-state-map (kbd "RET")
   'evil-multiedit-toggle-or-restrict-region)
 
-(define-key evil-multiedit-state-map (kbd "C-n")
+(define-key evil-multiedit-mode-map (kbd "C-n")
   'evil-multiedit-next)
-(define-key evil-multiedit-state-map (kbd "C-p")
+(define-key evil-multiedit-mode-map (kbd "C-p")
   'evil-multiedit-prev)
-(define-key evil-multiedit-insert-state-map (kbd "C-n")
+(define-key evil-multiedit-mode-map (kbd "C-n")
   'evil-multiedit-next)
-(define-key evil-multiedit-insert-state-map (kbd "C-p")
+(define-key evil-multiedit-mode-map (kbd "C-p")
   'evil-multiedit-prev)
 #+END_SRC
 
@@ -465,7 +452,8 @@ preferences.
 ** Incremental Completion with Helm
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'helm)
-(ensure-features 'helm-config)
+(require 'helm-config)
+
 (setq helm-candidate-number-limit 100)
 
 (setf helm-display-header-line nil
@@ -498,7 +486,7 @@ and replace facility, but sometimes useful for complex regular expressions
 with multiple grouping constructs.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-features 're-builder)
+(require 're-builder)
 (setf reb-re-syntax 'string)
 #+END_SRC
 
@@ -543,7 +531,8 @@ by typing `C-q' before finishing the word.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'org)
-(ensure-features 'org-entities)
+(require 'org)
+(require 'org-entities)
 (require 'cl-lib)
 
 (dolist (entity org-entities)
@@ -595,13 +584,6 @@ by typing `C-q' before finishing the word.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'bash-completion)
 (bash-completion-setup)
-#+END_SRC
-** Environment Variables
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'exec-path-from-shell)
-(dolist (var '("SSH_AUTH_SOCK" "SSH_AGENT_PID" "GPG_AGENT_INFO" "LANG" "LC_CTYPE" "PKG_CONFIG_PATH" "LD_LIBRARY_PATH"))
-  (add-to-list 'exec-path-from-shell-variables var))
-(exec-path-from-shell-initialize)
 #+END_SRC
 
 * Major Modes
@@ -738,45 +720,12 @@ between organizing, note taking and programming in amazing ways.
 
 *** Encrypting parts of a buffer with Org Crypt
 #+BEGIN_SRC emacs-lisp
-(ensure-features 'org-crypt)
+(require 'org-crypt)
 (setf auto-save-default nil)
 (org-crypt-use-before-save-magic)
 (setf org-tags-exclude-from-inheritance '("crypt"))
 (setf org-crypt-key "05369722")
 #+END_SRC
-
-*** Efficient Learning with Org drill
-Org drill is an amazing tool to learn new facts. In a first step, one creates
-drill cards, which are nothing more than org sub trees with some meta data and the
-`:drill:' tag. Afterwards the command `org-drill' will start a sophisticated
-drill session.
-
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'org 'org-drill)
-(ensure-features 'org-drill)
-;; prevent drill hints from ruining Latex formulas
-(setf org-drill-hint-separator "||HINT||")
-#+END_SRC
-
-Below is the helpful bug fix for a org-drill redisplay issue.
-
-#+BEGIN_QUOTE
-Thanks!  I can reproduce your issue with a relatively fresh Emacs 25 and
-org from git.
-
-AFAICS the window gets blanked sometimes in function
-org-toggle-latex-fragment of org.el in line
-
---8<---------------cut here---------------start------------->8---
-;; Work around a bug that doesn't restore window's start
-;; when widening back the buffer.
-(set-window-start nil window-start)
---8<---------------cut here---------------end--------------->8---
-
-A workaround would be to comment out just this line.
-
-I don't know if this is a reliable fix though.
-#+END_QUOTE
 
 ** Latex Editing with Auctex
 Auctex is by far the best Latex editing environment on the planet, only
@@ -784,7 +733,7 @@ surpassed by the Org mode Latex export facility and `cdlatex'.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'auctex 'company-auctex)
-(ensure-features 'latex)
+(require 'latex)
 (setq-default TeX-PDF-mode t)
 (company-auctex-init)
 ;; Use Okular as the primary PDF viewer
@@ -811,7 +760,7 @@ Another one is to enable recursive copies and enable
 between adjacent [[info:Emacs#Windows][Emacs windows]].
 
 #+BEGIN_SRC emacs-lisp
-(ensure-features 'dired)
+(require 'dired)
 (setf dired-dwim-target t
       dired-recursive-copies 'top
       dired-recursive-deletes 'top
@@ -945,7 +894,7 @@ Objective-C, Java, CORBA IDL (and the variants PSDL and CIDL), Pike and
 AWK code.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-features 'cc-mode)
+(require 'cc-mode)
 (add-to-list 'auto-mode-alist `("\\.cl\\'" . c-mode))
 (add-to-list 'auto-mode-alist `("\\.frag\\'" . c-mode))
 (add-to-list 'auto-mode-alist `("\\.vert\\'" . c-mode))
@@ -1122,7 +1071,7 @@ With a prefix argument, perform `macroexpand-all' instead."
 ** Maxima
 #+BEGIN_SRC emacs-lisp
 (add-to-list 'load-path "/usr/share/emacs/site-lisp/maxima/")
-(ensure-features 'maxima)
+(require 'maxima)
 (autoload 'maxima-mode "maxima" "Maxima mode" t)
 (autoload 'imaxima "imaxima" "Frontend for maxima with Image support" t)
 (autoload 'maxima "maxima" "Maxima interaction" t)
@@ -1130,7 +1079,7 @@ With a prefix argument, perform `macroexpand-all' instead."
 (setq imaxima-use-maxima-mode-flag t)
 (add-to-list 'auto-mode-alist `("\\.ma[cx]\\'" . maxima-mode))
 
-(ensure-features 'imaxima)
+(require 'imaxima)
 ;; This is a little bugfix, otherwise imaxima decided the equation color
 ;; was NIL and would fail
 (setf imaxima-equation-color "#DCDCCC")
@@ -1155,7 +1104,7 @@ With a prefix argument, perform `macroexpand-all' instead."
 There is a whole family of programming environments for applied mathematics
 with Octave-like syntax.
 #+BEGIN_SRC emacs-lisp
-(ensure-features 'octave)
+(require 'octave)
 (add-to-list 'auto-mode-alist `("\\.sci\\'". octave-mode))
 (add-to-list 'auto-mode-alist `("\\.m\\'". octave-mode))
 #+END_SRC
@@ -1305,7 +1254,7 @@ open windows small.
 
 ** Encryption
 #+BEGIN_SRC emacs-lisp
-(ensure-features 'epa-file)
+(require 'epa-file)
 (epa-file-enable)
 
 (defun truly-random-letter ()
@@ -1430,19 +1379,21 @@ This chapter deals with the visual appearance of Emacs. Interested readers
 might want to read the section [[info:Elisp#Display][Display]] of the Emacs Lisp manual.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'airline-themes 'doom-themes 'spaceline)
-(ensure-features 'spaceline-config)
-
+(ensure-packages 'powerline 'spaceline 'airline-themes 'doom-themes)
+(require 'spaceline)
+(require 'airline-themes)
+(spaceline-spacemacs-theme)
 (setf doom-themes-enable-bold nil)
 (setf airline-shortened-directory-length 20)
-(setf powerline-default-separator 'slant)
-
-(airline-themes-set-modeline)
+(setq airline-eshell-colors t)
+(setq airline-helm-colors t)
+(setq airline-cursor-colors t)
 
 (defun init.el-load-themes ()
   (load-theme 'doom-nord t)
-  (doom-themes-org-config)
   (load-theme 'airline-base16_nord t)
+  (doom-themes-org-config)
+  (spaceline-helm-mode 1)
   (derive-faces))
 
 (if (daemonp)
@@ -1497,7 +1448,7 @@ frequently used `evil-normal-state-entry-hook'.
           (buffer-modified-p) ; there should be modifications
           (buffer-file-name)  ; there should be a file to save to
           (file-exists-p (buffer-file-name))
-          (case major-mode
+          (cl-case major-mode
             ;; no org-crypt tags should be present
             (org-mode (not (org-map-entries t "+crypt" 'file)))
             (otherwise t)))))
@@ -1514,7 +1465,7 @@ Another frequent operation is to `leave-somehow', depending on the context.
   (interactive "P")
   (save-if-appropriate)
   (let ((buffer (current-buffer)))
-    (case major-mode
+    (cl-case major-mode
       (Info-mode (Info-up))
       (help-mode (quit-window))
       (wdired-mode (evil-change-state 'normal)
@@ -1525,7 +1476,7 @@ Another frequent operation is to `leave-somehow', depending on the context.
       (dired-mode (dired-up-directory))
       (otherwise
        (cond ((not (eq evil-state 'normal))
-              (case evil-state
+              (cl-case evil-state
                 (multiedit (evil-multiedit-abort))
                 (otherwise (evil-change-to-previous-state))))
              ((minibufferp buffer)

@@ -333,10 +333,10 @@ section shows how to set it up.
 (global-undo-tree-mode 1)
 (setf undo-tree-visualizer-timestamps t)
 (setf undo-tree-visualizer-diff t)
-
-(setq undo-tree-history-directory-alist '(("." . "~/.emacs.d/.cache")))
-
+(setf undo-tree-history-directory-alist '(("." . "~/.emacs.d/.cache")))
+(setq undo-tree-enable-undo-in-region nil)
 (setf evil-echo-state nil)
+(setf evil-undo-system 'undo-tree)
 (evil-mode 1)
 (define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
 
@@ -602,6 +602,15 @@ by typing `C-q' before finishing the word.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'bash-completion)
 (bash-completion-setup)
+#+END_SRC
+
+** Environment Variables
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'exec-path-from-shell)
+(require 'exec-path-from-shell)
+(dolist (var '("SSH_AUTH_SOCK" "SSH_AGENT_PID" "GPG_AGENT_INFO" "LANG" "LC_CTYPE" "PKG_CONFIG_PATH" "LD_LIBRARY_PATH"))
+  (add-to-list 'exec-path-from-shell-variables var))
+(exec-path-from-shell-initialize)
 #+END_SRC
 
 * Major Modes

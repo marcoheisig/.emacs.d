@@ -292,16 +292,34 @@ solves many of the issues of package.el, MELPA and the like.
   (load bootstrap-file nil 'nomessage))
 #+END_SRC
 
+That's it for the meta configuration!
+
 * Minor Modes and Miscellaneous Utilities
 [[info:Emacs#Minor%20Modes][Minor Modes]] add a variety of secondary features to currently edited
 buffers. Any number of minor modes can be active at a time.
 
-** Flycheck
-Flyspell adds spellchecking to Emacs.
+** Spell Checking
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'flycheck)
-(global-flycheck-mode)
+(ensure-packages 'flyspell)
+(setf ispell-program-name "aspell")
+(setf aspell-dictionary "en_US-wo_accents")
+(setf ispell-dictionary "en_US-wo_accents")
+(setf aspell-program-name "/usr/bin/aspell")
+(setf ispell-program-name "/usr/bin/aspell")
+
+(define-key flyspell-mode-map [down-mouse-3] 'flyspell-correct-word)
+
+(defun enable-flyspell-mode ()
+  (flyspell-mode 1))
+
+(defun enable-flyspell-prog-mode ()
+  (flyspell-prog-mode 1))
+
+(add-hook 'org-mode-hook 'enable-flyspell-mode)
+(add-hook 'text-mode-hook 'enable-flyspell-mode)
+(add-hook 'TeX-mode-hook 'enable-flyspell-mode)
+(add-hook 'prog-mode-hook 'enable-flyspell-prog-mode)
 #+END_SRC
 
 ** The Evil Mode
@@ -728,8 +746,8 @@ between organizing, note taking and programming in amazing ways.
 #+END_SRC
 
 ** Latex Editing with Auctex
-Auctex is by far the best Latex editing environment on the planet, only
-surpassed by the Org mode Latex export facility and `cdlatex'.
+Auctex is an amazing LaTeX editing environment.  To bad that I use Org-mode
+to generate LaTeX most of the time.
 
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'auctex 'company-auctex)

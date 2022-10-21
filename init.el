@@ -341,7 +341,8 @@ section shows how to set it up.
 (define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
 
 ;; Retain Emacs semantics of M-.
-(define-key evil-normal-state-map (kbd "M-.") (kbd "\\ M-."))
+
+(define-key evil-normal-state-map (kbd "M-.") nil)
 
 (defun enable-evil-motion-state ()
   "Useful for major mode hooks to evable evil motion state unconditionally."
@@ -1158,6 +1159,7 @@ with Octave-like syntax.
 (ensure-packages 'with-editor 'magit 'evil-magit)
 (setf evil-magit-state 'motion)
 (define-key global-map (kbd "C-x g") 'magit-status)
+(define-key magit-mode-map (kbd ":") 'evil-ex)
 #+END_SRC
 
 ** CUDA

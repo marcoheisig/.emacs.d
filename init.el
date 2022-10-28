@@ -204,7 +204,8 @@ if items cannot be ensured.
 
 (defun ensure-package (package)
   "Ensure that the designated PACKAGE is installed."
-  (straight-use-package package))
+  (straight-use-package package)
+  (ignore-errors (require package)))
 
 (defun ensure-packages (&rest packages)
   "Ensure that the designated PACKAGES are installed."
@@ -313,13 +314,10 @@ buffers. Any number of minor modes can be active at a time.
 (defun enable-flyspell-mode ()
   (flyspell-mode 1))
 
-(defun enable-flyspell-prog-mode ()
-  (flyspell-prog-mode 1))
-
 (add-hook 'org-mode-hook 'enable-flyspell-mode)
 (add-hook 'text-mode-hook 'enable-flyspell-mode)
 (add-hook 'TeX-mode-hook 'enable-flyspell-mode)
-(add-hook 'prog-mode-hook 'enable-flyspell-prog-mode)
+(add-hook 'prog-mode-hook 'flyspell-prog-mode)
 #+END_SRC
 
 ** The Evil Mode
@@ -1100,6 +1098,10 @@ With a prefix argument, perform `macroexpand-all' instead."
 #+BEGIN_SRC emacs-lisp
 (add-to-list 'load-path "/usr/share/emacs/site-lisp/maxima/")
 (require 'maxima)
+;; The imaxima library refers to the cl package, which triggers an annoying
+;; warning.  We solve this by temporarily supressing the byte compiler's
+;; warnings.
+(setq byte-compile-warnings '())
 (autoload 'maxima-mode "maxima" "Maxima mode" t)
 (autoload 'imaxima "imaxima" "Frontend for maxima with Image support" t)
 (autoload 'maxima "maxima" "Maxima interaction" t)
@@ -1118,6 +1120,7 @@ With a prefix argument, perform `macroexpand-all' instead."
 \\usepackage{euler}
 ")
 (setf imaxima-scale-factor 1.4)
+(setq byte-compile-warnings t)
 #+END_SRC
 
 ** Scheme Programming

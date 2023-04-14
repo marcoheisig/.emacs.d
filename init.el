@@ -191,7 +191,7 @@ the presence of certain packages, features and files. Errors are signaled
 if items cannot be ensured.
 
 #+BEGIN_SRC emacs-lisp
-;; Define error signals for missing packages and features. 
+;; Define error signals for missing packages and features.
 (cl-flet ((define-error (name message)
             (if (fboundp 'define-error)
                 (define-error name message)
@@ -332,13 +332,14 @@ section shows how to set it up.
 (setf undo-tree-visualizer-timestamps t)
 (setf undo-tree-visualizer-diff t)
 (setf undo-tree-history-directory-alist '(("." . "~/.emacs.d/.cache")))
-(setq undo-tree-enable-undo-in-region nil)
+(setf undo-tree-auto-save-history nil)
+(setf undo-tree-enable-undo-in-region nil)
 (setf evil-echo-state nil)
-(setf evil-undo-system 'undo-tree)
+(custom-set-variables '(evil-undo-system 'undo-tree))
 (evil-mode 1)
 (define-key evil-normal-state-map (kbd "U") 'undo-tree-visualize)
 
-;; Retain Emacs semantics of M-.
+;; Retain Emacs semantics of M-. and RET
 
 (define-key evil-normal-state-map (kbd "M-.") nil)
 
@@ -469,7 +470,6 @@ preferences.
 ** Incremental Completion with Helm
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'helm)
-(require 'helm-config)
 
 (setq helm-candidate-number-limit 100)
 
@@ -507,10 +507,10 @@ with multiple grouping constructs.
 (setf reb-re-syntax 'string)
 #+END_SRC
 
-** Bibliographic References with Reftex
+** Bibliographic References with Org ref
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'reftex)
+(ensure-packages 'citeproc)
 (defun org-mode-reftex-setup ()
   (interactive)
   (and (buffer-file-name) (file-exists-p (buffer-file-name))
@@ -593,7 +593,7 @@ by typing `C-q' before finishing the word.
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'key-chord)
 (key-chord-mode 1)
-(setf key-chord-two-keys-delay 0.07)
+(setf key-chord-two-keys-delay 0.04)
 (setf key-chord-one-key-delay 0.14)
 #+END_SRC
 
@@ -633,7 +633,7 @@ between organizing, note taking and programming in amazing ways.
 
 *** Basics
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org)
+(ensure-packages 'org 'evil-org)
 (require 'org)
 (require 'ox-md)
 (setf org-export-backends '(ascii html icalendar latex beamer odt))
@@ -658,6 +658,8 @@ between organizing, note taking and programming in amazing ways.
 (global-set-key "\C-ca" 'org-agenda)
 
 (add-hook 'org-mode-hook 'org-indent-mode)
+(add-hook 'org-mode-hook 'evil-org-mode)
+(evil-org-set-key-theme '(navigation insert textobjects additional calendar return))
 #+END_SRC
 
 *** Organizing with Org Agenda
@@ -702,46 +704,35 @@ between organizing, note taking and programming in amazing ways.
 *** Exporting Org mode buffers
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'cdlatex 'org 'htmlize)
-(add-hook 'org-mode-hook 'turn-on-org-cdlatex)
-
-(cl-pushnew '("pdf" . "evince %s") org-file-apps)
-
-(setf org-latex-create-formula-image-program 'imagemagick)
-(setf org-latex-listings 'minted)
-(add-to-list 'org-latex-default-packages-alist
- '("" "minted"))
-(setf org-latex-minted-options
-      '(("frame" "single")
-        ("framesep" "6pt")
-        ("encoding" "utf8")
-        ("mathescape" "true")
-        ("fontsize" "\\footnotesize")))
-(setq
- org-latex-pdf-process
- '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-   "bibtex $(basename %b)"
-   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
-   "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
-(setq
- LaTeX-command-style
- '((""
-    "%(PDF)%(latex) -shell-escape %(file-line-error) %(extraopts) %S%(PDFout)")))
+(ensure-packages 'org 'htmlize 'engrave-faces)
 #+END_SRC
 
 *** Managing source code with Org Babel
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org 'gnuplot)
+(ensure-packages 'org 'gnuplot 'graphviz-dot-mode)
 (setf org-edit-src-content-indentation 0)
 (setf org-src-preserve-indentation nil)
 (setf org-src-tab-acts-natively t)
 (setf org-src-window-setup 'other-window)
 (setq-default org-export-babel-evaluate 'inline-only)
+(setf graphviz-dot-indent-width 4)
 
 (org-babel-do-load-languages
  'org-babel-load-languages
- '((gnuplot . t)))
+ '((gnuplot . t)
+   (dot . t)
+   (python . t)
+   (emacs-lisp . t)
+   (lisp . t)))
+
+(defun my-latex-filter-nobreaks (text backend info)
+  "Ensure \" \" are properly handled in LaTeX export."
+  (when (org-export-derived-backend-p backend 'latex)
+    (replace-regexp-in-string " " "~" text)))
+
+(add-to-list 'org-export-filter-plain-text-functions
+             'my-latex-filter-nobreaks)
 #+END_SRC
 
 *** Encrypting parts of a buffer with Org Crypt
@@ -968,7 +959,7 @@ itself a lot.
    slime-company
    slime-autodoc))
 
-(setf inferior-lisp-program "~/usr/bin/sbcl")
+(setf inferior-lisp-program "sbcl")
 (setf slime-lisp-host "localhost")
 
 ;; Improve indentation of some forms.
@@ -983,6 +974,11 @@ itself a lot.
      '((&whole 4 &rest (&whole 1 1 2)) &body))
 (put 'dx-let* 'common-lisp-indent-function
      '((&whole 4 &rest (&whole 1 1 2)) &body))
+(put 'lazy 'common-lisp-indent-function '(1 &rest 1))
+(put 'lazy-reduce 'common-lisp-indent-function '(1 &rest 1))
+(put 'lazy-multireduce 'common-lisp-indent-function '(1 1 &rest 1))
+(put 'lazy-multiple-value 'common-lisp-indent-function '(1 1 &rest 1))
+(put 'lazy-reshape 'common-lisp-indent-function '(1 &rest 1))
 
 (defun tweak-slime-repl ()
   (setf tab-always-indent t) ; prevent the annoying default completion
@@ -1094,6 +1090,13 @@ With a prefix argument, perform `macroexpand-all' instead."
             (pp expansion)))))))
 #+END_SRC
 
+** Python
+
+#+begin_src emacs-lisp
+(ensure-packages 'eglot 'lsp-pyright)
+(add-hook 'python-mode-hook 'eglot-ensure)
+#+end_src
+
 ** Maxima
 #+BEGIN_SRC emacs-lisp
 (add-to-list 'load-path "/usr/share/emacs/site-lisp/maxima/")
@@ -1170,6 +1173,10 @@ with Octave-like syntax.
 (ensure-packages 'cuda-mode)
 #+END_SRC
 
+** YAML
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'yaml-mode)
+#+END_SRC
 * User Interface
 This chapter is concerned with the interaction between Emacs and human
 beings. The aim is to provide a very distraction free environment for the
@@ -1193,7 +1200,7 @@ Emacs variable and function, respectively.
 (setf save-abbrevs nil)
 (column-number-mode 1)
 (setf echo-keystrokes 0.01)
-(setq-default fill-column 75)
+(setq-default fill-column 79)
 (setq-default truncate-lines t)
 (setq-default initial-major-mode 'org-mode)
 (setq-default major-mode 'org-mode)
@@ -1508,9 +1515,7 @@ Another frequent operation is to `leave-somehow', depending on the context.
       (dired-mode (dired-up-directory))
       (otherwise
        (cond ((not (eq evil-state 'normal))
-              (cl-case evil-state
-                (multiedit (evil-multiedit-abort))
-                (otherwise (evil-change-to-previous-state))))
+              (evil-normal-state))
              ((minibufferp buffer)
               (minibuffer-keyboard-quit))
              ((buffer-file-name)

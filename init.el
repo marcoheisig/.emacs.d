@@ -1093,8 +1093,9 @@ With a prefix argument, perform `macroexpand-all' instead."
 ** Python
 
 #+begin_src emacs-lisp
-(ensure-packages 'eglot 'lsp-pyright)
+(ensure-packages 'eglot 'lsp-pyright 'python-docstring)
 (add-hook 'python-mode-hook 'eglot-ensure)
+(python-docstring-install)
 #+end_src
 
 ** Maxima

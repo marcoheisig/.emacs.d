@@ -363,17 +363,6 @@ formats.
 (define-key global-map (kbd "<f12>") 'camcorder-mode)
 #+END_SRC
 
-** The Insidious Big Brother Database for Emacs
-BBDB is a great address database written in Emacs Lisp.
-
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'bbdb)
-(setf bbdb-default-country "Germany"
-      bbdb-file "~/.emacs.d/bbdb"
-      bbdb-gui t)
-(bbdb-initialize)
-#+END_SRC
-
 ** Automatic Text Completion with Company
 When enabled, Company displays possible completion candidates for
 individual words. This is particularly useful in programming modes, where
@@ -589,14 +578,6 @@ by typing `C-q' before finishing the word.
 (setf show-paren-style 'parenthesis)
 #+END_SRC
 
-** Key Chord Mode
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'key-chord)
-(key-chord-mode 1)
-(setf key-chord-two-keys-delay 0.04)
-(setf key-chord-one-key-delay 0.14)
-#+END_SRC
-
 ** Bash Completion
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'bash-completion)
@@ -613,6 +594,15 @@ by typing `C-q' before finishing the word.
 #+END_SRC
 
 * Major Modes
+
+** Magit
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'transient 'with-editor 'magit 'evil-magit)
+(setf evil-magit-state 'motion)
+(define-key global-map (kbd "C-x g") 'magit-status)
+(define-key magit-mode-map (kbd ":") 'evil-ex)
+#+END_SRC
+
 ** GNU APL
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'gnu-apl-mode)
@@ -623,6 +613,11 @@ by typing `C-q' before finishing the word.
 
 (add-hook 'gnu-apl-interactive-mode-hook 'em-gnu-apl-init)
 (add-hook 'gnu-apl-mode-hook 'em-gnu-apl-init)
+#+END_SRC
+
+** CMake
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'cmake-mode)
 #+END_SRC
 
 ** The Org Mode
@@ -701,6 +696,13 @@ between organizing, note taking and programming in amazing ways.
                \"%?\"")))
 #+END_SRC
 
+*** Org Reveal
+
+#+BEGIN_SRC emacs-lisp
+(ensure-packages 'org-reveal)
+(require 'ox-reveal)
+#+END_SRC
+
 *** Exporting Org mode buffers
 
 #+BEGIN_SRC emacs-lisp
@@ -710,7 +712,7 @@ between organizing, note taking and programming in amazing ways.
 *** Managing source code with Org Babel
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'org 'gnuplot 'graphviz-dot-mode)
+(ensure-packages 'org 'gnuplot 'graphviz-dot-mode 'ebnf-mode)
 (setf org-edit-src-content-indentation 0)
 (setf org-src-preserve-indentation nil)
 (setf org-src-tab-acts-natively t)
@@ -722,8 +724,10 @@ between organizing, note taking and programming in amazing ways.
  'org-babel-load-languages
  '((gnuplot . t)
    (dot . t)
+   (shell . t)
    (python . t)
    (emacs-lisp . t)
+   (maxima . t)
    (lisp . t)))
 
 (defun my-latex-filter-nobreaks (text backend info)
@@ -1093,9 +1097,27 @@ With a prefix argument, perform `macroexpand-all' instead."
 ** Python
 
 #+begin_src emacs-lisp
-(ensure-packages 'eglot 'lsp-pyright 'python-docstring)
+(ensure-packages 'eglot 'lsp-pyright)
 (add-hook 'python-mode-hook 'eglot-ensure)
-(python-docstring-install)
+(add-to-list 'project-vc-extra-root-markers "pyrightconfig.json")
+#+end_src
+
+** JSON
+
+#+begin_src emacs-lisp
+(ensure-packages 'js)
+(setq js-indent-level 2)
+#+end_src
+
+
+** Jinja Template Engine
+
+#+begin_src emacs-lisp
+(ensure-packages 'mmm-jinja2)
+(add-to-list 'auto-mode-alist '("\\.html\\.jinja\\'" . html-mode))
+(mmm-add-mode-ext-class 'html-mode "\\.html\\.jinja\\'" 'jinja)
+(add-to-list 'auto-mode-alist '("\\.py\\.jinja\\'" . python-mode))
+(mmm-add-mode-ext-class 'python-mode "\\.py\\.jinja\\'" 'jinja)
 #+end_src
 
 ** Maxima
@@ -1160,15 +1182,6 @@ with Octave-like syntax.
 (setq smtpmail-smtp-server "groupware.fau.de"
       smtpmail-smtp-service 587)
 #+END_SRC
-
-** Magit
-#+BEGIN_SRC emacs-lisp
-(ensure-packages 'with-editor 'magit 'evil-magit)
-(setf evil-magit-state 'motion)
-(define-key global-map (kbd "C-x g") 'magit-status)
-(define-key magit-mode-map (kbd ":") 'evil-ex)
-#+END_SRC
-
 ** CUDA
 #+BEGIN_SRC emacs-lisp
 (ensure-packages 'cuda-mode)
@@ -1300,7 +1313,7 @@ open windows small.
 (defun truly-random-letter ()
   (let ((letters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?"))
     ;; note: letters has 64 characters, or 6 bits of information
-    (assert (= 64 (length letters)))
+    (cl-assert (= 64 (length letters)))
     (elt letters
          (with-temp-buffer
            (set-buffer-multibyte nil)
@@ -1310,7 +1323,7 @@ open windows small.
 (defun insert-new-password (length)
   (interactive "nlength: ")
   (insert
-   (apply #'string (loop repeat length collect (truly-random-letter)))))
+   (apply #'string (cl-loop repeat length collect (truly-random-letter)))))
 
 (setenv "SSH_AUTH_SOCK"
         (remove ?\n (shell-command-to-string "gpgconf --list-dirs agent-ssh-socket")))
@@ -1325,7 +1338,7 @@ code derives sane values for such faces automatically. As a result, one can
 load any color theme and get a consistent experience.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'rainbow-delimiters 'org 'diredfl)
+(ensure-packages 'rainbow-delimiters 'rainbow-mode 'org 'diredfl)
 
 (diredfl-global-mode 1)
 
@@ -1538,7 +1551,18 @@ layout. This configuration permits to select different positional bindings
 to accommodate for different keyboard layouts.
 
 #+BEGIN_SRC emacs-lisp
-(ensure-packages 'key-chord 'evil)
+(ensure-packages
+ '(key-chord
+   :host github
+   :type git
+   :repo "marcoheisig/key-chord"
+   :branch "marcoheisig"))
+
+(key-chord-mode 1)
+(setf key-chord-two-keys-delay 0.08)
+(setf key-chord-one-key-delay 0.14)
+
+(ensure-packages 'evil)
 
 (defvar qwerty-mode-map
   (let ((map (make-sparse-keymap)))
@@ -1602,7 +1626,7 @@ Use occur to search one or more buffers.
    (list
     (if (eq major-mode 'dired-mode)
         (let ((files (directory-files-recursively "." (read-regexp "Search files matching: "))))
-          (loop for file in files
+          (cl-loop for file in files
                 unless (file-directory-p file)
                 collect (save-window-excursion
                           (find-file file)
@@ -1624,6 +1648,7 @@ started. The list contains mostly directories.
   (find-file "~/userdata/*" t)
   (find-file "~/userdata/proj/*" t)
   (find-file "~/Downloads" t))
+
 (setf initial-buffer-choice "~/userdata")
 #+END_SRC
 
